@@ -2,11 +2,36 @@
 using NAudio.Wave;
 using SpatialAudio;
 using System;
+using System.Runtime.InteropServices;
 
 namespace Audio{
     class Program{
+        const string RESET = "\x1b[0m";
+        const string DIM = "\x1b[2m";
+        const string BLUE = "\x1b[34m";
+        const string GREEN = "\x1b[32m";
+
+        [DllImport("kernel32.dll")]
+        static extern IntPtr GetStdHandle(int nStdHandle);
+
+        [DllImport("kernel32.dll")]
+        static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+
+        [DllImport("kernel32.dll")]
+        static extern bool SetConsoleMode(IntPtr handle, uint mode);
+
+        static void EnableAnsiColors()
+        {
+            IntPtr handle = GetStdHandle(-11);
+            if (GetConsoleMode(handle, out uint mode))
+            {
+                SetConsoleMode(handle, mode | 0x0004);
+            }
+        }
+
         static void Main(string[] args){
             WindowTracker.EnablePerMonitorDpiAwareness();
+            EnableAnsiColors();
             WindowTracker.ListMonitors();
             
             MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
@@ -47,15 +72,30 @@ namespace Audio{
                     WasapiOut output = new WasapiOut(devices[o - 1], AudioClientShareMode.Shared, false, 100);
                     output.Init(bufferedWave);
                     output.Play();
+                    Console.WriteLine();
+                    Console.WriteLine($"{DIM}CAPTURE: {devices[c - 1].FriendlyName}  ->  OUTPUT: {devices[o - 1].FriendlyName}{RESET}");
+                    Console.WriteLine();
+                    int readoutRow = Console.CursorTop;
                     Console.CursorVisible = false;
-                    Console.Clear();
+                    string lastLine = "";
                     while (true)
                     {
                         if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape) break;
-                        Console.SetCursorPosition(0, 0);
                         var (az, dist, title) = WindowTracker.GetFocusedInfo();
                         Spatializer.CurrentAzimuthDeg = az;
-                        Console.Write($"{title,-40} -> {az:F1} deg, {dist:F0}px".PadRight(110));
+                        if (title.Length > 40) title = title.Substring(0, 40);
+                        string color = az < 0 ? BLUE : GREEN;
+                        string side = az < 0 ? "left" : "right";
+                        string visibleLine = $"{title,-40} -> {az:F1} deg {side}, {dist:F0}px";
+                        string line = $"{title,-40} -> {color}{az:F1} deg {side}{RESET}, {DIM}{dist:F0}px{RESET}";
+                        int pad = 110 - visibleLine.Length;
+                        if (pad > 0) line += new string(' ', pad);
+                        if (line != lastLine)
+                        {
+                            Console.SetCursorPosition(0, readoutRow);
+                            Console.Write(line);
+                            lastLine = line;
+                        }
                         Thread.Sleep(300);
                     }
                     Console.CursorVisible = true;
