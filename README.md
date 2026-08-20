@@ -11,8 +11,8 @@ reviewed by an AI mentor. Personal study notes are kept out of the repo.
 | Milestone | What it does | Status |
 |---|---|---|
 | M0 | Capture desktop audio (WASAPI loopback), play it back with low latency | **done** — device menu, capture→playback, latency measurement (2.8/29.4/55.3 ms min/avg/max) |
-| M1 | Track focused window position → azimuth/distance across monitors | **done** — Win32 window/monitor tracking, live azimuth readout (front-arc model, ±45° stage) |
-| M2 | Spatializer v1: interaural time delay + level panning | not started |
+| M1 | Track focused window position → azimuth/distance across monitors | **done** — Win32 window/monitor tracking, live azimuth readout (front-arc model, ±70° stage) |
+| M2 | Spatializer v1: interaural time delay + level panning | **done** — ITD ring-buffer delay + equal-power ILD; audio follows the focused window; direction verified by ear |
 | M3 | HRTF: true 3D audio via convolution with measured head filters | not started |
 | M4 | Polish: smoothing, config, standalone .exe | not started |
 | M5 (stretch) | Per-app audio routing via virtual cable | not started |

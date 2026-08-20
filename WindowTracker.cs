@@ -117,29 +117,32 @@ namespace SpatialAudio
             EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorCallBack, IntPtr.Zero);
         }
 
-        public static string DescribeFocusedPosition()
+        public static (float azimuth, float distance, string title) GetFocusedInfo()
         {
             IntPtr fWindow = GetForegroundWindow();
-            if (!IsWindowVisible(fWindow)) return "Not visible";
-            GetWindowRect(fWindow, out RECT rect);
+            if (IsWindowVisible(fWindow))
+            {
+                GetWindowRect(fWindow, out RECT rect);
 
-            StringBuilder title = new StringBuilder(256);
-            int chars = GetWindowText(fWindow, title, 256);
-            string t = chars == 0 ? "(no title)" : title.ToString();
+                StringBuilder title = new StringBuilder(256);
+                int chars = GetWindowText(fWindow, title, 256);
+                string t = chars == 0 ? "(no title)" : title.ToString();
 
-            float cx = rect.Left + MathF.Abs(rect.Right - rect.Left) / 2;
-            float cy = rect.Top + MathF.Abs(rect.Bottom - rect.Top) / 2;
-            float lx = VirtualDesktop.Left + MathF.Abs(VirtualDesktop.Right - VirtualDesktop.Left) / 2;
-            float ly = VirtualDesktop.Top + MathF.Abs(VirtualDesktop.Bottom - VirtualDesktop.Top) / 2;
+                float cx = rect.Left + MathF.Abs(rect.Right - rect.Left) / 2;
+                float cy = rect.Top + MathF.Abs(rect.Bottom - rect.Top) / 2;
+                float lx = VirtualDesktop.Left + MathF.Abs(VirtualDesktop.Right - VirtualDesktop.Left) / 2;
+                float ly = VirtualDesktop.Top + MathF.Abs(VirtualDesktop.Bottom - VirtualDesktop.Top) / 2;
 
-            float dx = cx - lx;
-            float dy = cy - ly;
+                float dx = cx - lx;
+                float dy = cy - ly;
 
-            float eyeDistance = (VirtualDesktop.Right - VirtualDesktop.Left) / 2f;
-            float azimuth = MathF.Atan2(dx, eyeDistance) * 180.0f / MathF.PI;
-            float distance = MathF.Sqrt(dx * dx + dy * dy);
+                float halfWidth = (VirtualDesktop.Right - VirtualDesktop.Left) / 2f;
+                float eyeDistance = halfWidth / MathF.Tan(70f * MathF.PI / 180f);
+                float azimuth = MathF.Atan2(dx, eyeDistance) * 180.0f / MathF.PI;
+                float distance = MathF.Sqrt(dx * dx + dy * dy);
 
-            return $"{title,-40} -> {azimuth:F1}, {(azimuth < 0 ? "left" : "right")}, {distance:F0}px";
+                return (azimuth, distance, title.ToString());
+            }else { return (0, 0, "Not visible"); }
         }
     }
 }
