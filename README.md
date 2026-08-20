@@ -10,7 +10,7 @@ reviewed by an AI mentor. Personal study notes are kept out of the repo.
 
 | Milestone | What it does | Status |
 |---|---|---|
-| M0 | Capture desktop audio (WASAPI loopback), play it back with low latency | **in progress** — pieces 1–2 done (device menu + capture→playback), latency measurement next |
+| M0 | Capture desktop audio (WASAPI loopback), play it back with low latency | **done** — device menu, capture→playback, latency measurement (2.8/29.4/55.3 ms min/avg/max) |
 | M1 | Track focused window position → azimuth/distance across monitors | not started |
 | M2 | Spatializer v1: interaural time delay + level panning | not started |
 | M3 | HRTF: true 3D audio via convolution with measured head filters | not started |
@@ -34,6 +34,9 @@ reviewed by an AI mentor. Personal study notes are kept out of the repo.
    (same device is refused — feedback loop)
 4. Everything playing on the capture device streams through the output
    device until you press **Esc**
+5. Within the first seconds it also plays 10 test clicks through the captured
+   device, detects them in the loopback, and prints the measured latency
+   (min/avg/max ms). Quiet mix recommended for reliable detection.
 
 Example: music on the Chu2 headphones → capture Headphones, output to the
 LG monitor (2460G4) → you hear the mix through the app, ~100ms delayed.
