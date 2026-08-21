@@ -8,3 +8,7 @@ obj/
 # Private learning notes — never tracked or pushed
 LEARNING.md
 onlineQs.md
+linkedin_post.md
+
+# HRTF dataset (~1.4 MB of .dat files) — fetched, not authored
+data/

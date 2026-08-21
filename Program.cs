@@ -33,7 +33,46 @@ namespace Audio{
             WindowTracker.EnablePerMonitorDpiAwareness();
             EnableAnsiColors();
             WindowTracker.ListMonitors();
-            
+
+            Console.WriteLine("Choose run: 1. Standard audio spatializer, 2. HRTF Testing");
+
+            int.TryParse(Console.ReadLine(), out int c);
+            if(c == 1)
+            {
+                RunCapture();
+            }
+            else if(c == 2)
+            {
+                HrtfDatabase.ReadData();
+                float[] data = HrtfDatabase.GetIr(40, 289, "L");
+                Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");
+            }
+        }
+
+        static byte[] MakeClickTrain() {
+            WaveFormat wave = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
+
+            float[] waveForm = new float[wave.SampleRate * wave.Channels * 5];
+
+            for(int f  = 0; f < 240000; f++){
+                if(f % 24000 < 960) {
+                    float click = 0.5f * (MathF.Sin(2f * MathF.PI * 1000f * (f/48000f)));
+                    waveForm[f * 2] = click;
+                    waveForm[(f * 2) + 1] = click;
+                }
+                else {
+                    waveForm[f * 2] = 0;
+                    waveForm[(f * 2) + 1] = 0;
+                }
+            }
+
+            byte[] bytes = new byte[waveForm.Length * 4];
+            Buffer.BlockCopy(waveForm, 0, bytes, 0, bytes.Length);
+            return bytes;
+        }
+
+        public static void RunCapture()
+        {
             MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
             MMDeviceCollection endPoints = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
             List<MMDevice> devices = new List<MMDevice>();
@@ -66,7 +105,7 @@ namespace Audio{
                         Buffer.BlockCopy(chunk, 0, processed, 0, e.BytesRecorded);
                         bufferedWave.AddSamples(processed, 0, e.BytesRecorded);
                     }
-                    
+
                     capture.StartRecording();
 
                     WasapiOut output = new WasapiOut(devices[o - 1], AudioClientShareMode.Shared, false, 100);
@@ -75,6 +114,7 @@ namespace Audio{
                     Console.WriteLine();
                     Console.WriteLine($"{DIM}CAPTURE: {devices[c - 1].FriendlyName}  ->  OUTPUT: {devices[o - 1].FriendlyName}{RESET}");
                     Console.WriteLine();
+
                     int readoutRow = Console.CursorTop;
                     Console.CursorVisible = false;
                     string lastLine = "";
@@ -108,29 +148,6 @@ namespace Audio{
                 else { Console.WriteLine("Error: Not a number or not within listed range or is the same as capture device."); }
             }
             else { Console.WriteLine("Error: Not a number or not within listed range"); }
-
-        }
-
-        static byte[] MakeClickTrain() {
-            WaveFormat wave = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
-
-            float[] waveForm = new float[wave.SampleRate * wave.Channels * 5];
-
-            for(int f  = 0; f < 240000; f++){
-                if(f % 24000 < 960) {
-                    float click = 0.5f * (MathF.Sin(2f * MathF.PI * 1000f * (f/48000f)));
-                    waveForm[f * 2] = click;
-                    waveForm[(f * 2) + 1] = click;
-                }
-                else {
-                    waveForm[f * 2] = 0;
-                    waveForm[(f * 2) + 1] = 0;
-                }
-            }
-
-            byte[] bytes = new byte[waveForm.Length * 4];
-            Buffer.BlockCopy(waveForm, 0, bytes, 0, bytes.Length);
-            return bytes;
         }
 
     }
