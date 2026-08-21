@@ -26,13 +26,13 @@ namespace SpatialAudio
                 return HashCode.Combine(Side, Elev, Az);
             }
         }
-        private static readonly string FolderPath = @"F:\Code\SpatialAudio\data\full\full";
-        private static Dictionary<HRTFLocator, float[]> DataFiles = [];
+        private static readonly string _folderPath = @"F:\Code\SpatialAudio\data\full\full";
+        private static Dictionary<HRTFLocator, float[]> _dataFiles = [];
         public static void ReadData()
         {
-            if (Directory.Exists(FolderPath))
+            if (Directory.Exists(_folderPath))
             {
-                var allDirectories = Directory.EnumerateDirectories(FolderPath, "elev*", SearchOption.AllDirectories);
+                var allDirectories = Directory.EnumerateDirectories(_folderPath, "elev*", SearchOption.AllDirectories);
 
                 foreach (string directory in allDirectories)
                 {
@@ -40,7 +40,7 @@ namespace SpatialAudio
                     foreach (var file in Directory.EnumerateFiles(directory))
                     {
                         elevations++;
-                        HRTFLocator hRTFFile = ParseFileName(Path.GetFileName(file));
+                        HRTFLocator hrtfFile = ParseFileName(Path.GetFileName(file));
                         byte[] data = File.ReadAllBytes(file);
                         float[] vals = new float[512];
                         int v = 0;
@@ -51,7 +51,7 @@ namespace SpatialAudio
 
                             vals[v++] = ((short)(a << 8 | b)) / 32768f;
                         }
-                        DataFiles.Add(hRTFFile, vals);
+                        _dataFiles.Add(hrtfFile, vals);
                     }
                     Console.WriteLine($"{Path.GetFileNameWithoutExtension(directory)}: {elevations}");
                 }
@@ -59,7 +59,7 @@ namespace SpatialAudio
             }
         }
 
-        public static HRTFLocator ParseFileName(String name)
+        private static HRTFLocator ParseFileName(String name)
         {
             string side = name.Substring(0,1);
             int e = name.IndexOf("e");
@@ -72,7 +72,7 @@ namespace SpatialAudio
         public static float[] GetIr(int elevation, int azimuth, string ear)
         {
             HRTFLocator locator = new HRTFLocator {Side = ear, Elev = elevation, Az = azimuth};
-            return DataFiles[locator];
+            return _dataFiles[locator];
         }
     }
 }

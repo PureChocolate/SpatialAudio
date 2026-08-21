@@ -2,15 +2,15 @@
 {
     internal static class Spatializer
     {
-        public static float CurrentAzimuthDeg;
-        public static float[] ring = new float[32];
-        public static int ringPos = 0;
+        public static float CurrentAzimuthDeg { get; set; }
+        private static float[] _ring = new float[32];
+        private static int _ringPos = 0;
 
         public static void Process(float[] samples, int sampleRate, float azimuthDeg)
         {
             float azRad = azimuthDeg * MathF.PI / 180f;
             int delay = (int)MathF.Round(30f * MathF.Sin(MathF.Abs(azRad)));
-            if (delay > ring.Length - 1) delay = ring.Length - 1;
+            if (delay > _ring.Length - 1) delay = _ring.Length - 1;
 
             int delayedIndex = azRad < 0 ? 1 : 0;
 
@@ -24,9 +24,9 @@
                 samples[i * 2] *= leftGain;
                 samples[i * 2 + 1] *= rightGain;
 
-                ring[ringPos] = samples[delayedChannel];
-                samples[delayedChannel] = ring[(ringPos - delay + ring.Length) % ring.Length];
-                ringPos = (ringPos + 1) % ring.Length;
+                _ring[_ringPos] = samples[delayedChannel];
+                samples[delayedChannel] = _ring[(_ringPos - delay + _ring.Length) % _ring.Length];
+                _ringPos = (_ringPos + 1) % _ring.Length;
             }
         }
     }

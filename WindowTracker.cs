@@ -26,7 +26,7 @@ namespace SpatialAudio
 
     internal static class WindowTracker
     {
-        private static RECT VirtualDesktop;
+        private static RECT _virtualDesktop;
         public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
         public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, ref RECT lprcMonitor, IntPtr lParam);
 
@@ -57,24 +57,12 @@ namespace SpatialAudio
         [DllImport("user32.dll")]
         static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-        public static void PrintFocusedWindow()
-        {
-            IntPtr fWindow = GetForegroundWindow();
-            if (!IsWindowVisible(fWindow)) return;
-            GetWindowRect(fWindow, out RECT rect);
-
-            StringBuilder title = new StringBuilder(256);
-            int chars = GetWindowText(fWindow, title, 256);
-            string t = chars == 0 ? "(no title)" : title.ToString();
-            Console.Write($"FOCUSED: {t,-60} | {rect.Left},{rect.Top},{rect.Right},{rect.Bottom}".PadRight(110));
-        }
-
         public static void EnablePerMonitorDpiAwareness()
         {
             SetProcessDpiAwarenessContext(-4);
         }
 
-        private static bool WindowCallBack(IntPtr hWnd, IntPtr lParam)
+        private static bool WindowCallback(IntPtr hWnd, IntPtr lParam)
         {
             if (!IsWindowVisible(hWnd)) return true;
             GetWindowRect(hWnd, out RECT rect);
@@ -94,27 +82,27 @@ namespace SpatialAudio
 
         public static void ListWindows()
         {
-            EnumWindows(WindowCallBack, IntPtr.Zero);
+            EnumWindows(WindowCallback, IntPtr.Zero);
         }
 
-        private static bool MonitorCallBack(IntPtr hMonitor, IntPtr hdc, ref RECT lprcMonitor, IntPtr lParam)
+        private static bool MonitorCallback(IntPtr hMonitor, IntPtr hdc, ref RECT lprcMonitor, IntPtr lParam)
         {
             MONITORINFO monitor = new MONITORINFO();
             monitor.cbSize = (uint)Marshal.SizeOf<MONITORINFO>();
             if (GetMonitorInfo(hMonitor, ref monitor))
             {
-                VirtualDesktop.Left = Math.Min(VirtualDesktop.Left, monitor.rcMonitor.Left);
-                VirtualDesktop.Top = Math.Min(VirtualDesktop.Top, monitor.rcMonitor.Top);
-                VirtualDesktop.Right = Math.Max(VirtualDesktop.Right, monitor.rcMonitor.Right);
-                VirtualDesktop.Bottom = Math.Max(VirtualDesktop.Bottom, monitor.rcMonitor.Bottom);
+                _virtualDesktop.Left = Math.Min(_virtualDesktop.Left, monitor.rcMonitor.Left);
+                _virtualDesktop.Top = Math.Min(_virtualDesktop.Top, monitor.rcMonitor.Top);
+                _virtualDesktop.Right = Math.Max(_virtualDesktop.Right, monitor.rcMonitor.Right);
+                _virtualDesktop.Bottom = Math.Max(_virtualDesktop.Bottom, monitor.rcMonitor.Bottom);
             }
             return true;
         }
 
         public static void ListMonitors()
         {
-            VirtualDesktop = new RECT { Left = int.MaxValue, Top = int.MaxValue, Right = int.MinValue, Bottom = int.MinValue };
-            EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorCallBack, IntPtr.Zero);
+            _virtualDesktop = new RECT { Left = int.MaxValue, Top = int.MaxValue, Right = int.MinValue, Bottom = int.MinValue };
+            EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, MonitorCallback, IntPtr.Zero);
         }
 
         public static (float azimuth, float distance, string title) GetFocusedInfo()
@@ -130,13 +118,13 @@ namespace SpatialAudio
 
                 float cx = rect.Left + MathF.Abs(rect.Right - rect.Left) / 2;
                 float cy = rect.Top + MathF.Abs(rect.Bottom - rect.Top) / 2;
-                float lx = VirtualDesktop.Left + MathF.Abs(VirtualDesktop.Right - VirtualDesktop.Left) / 2;
-                float ly = VirtualDesktop.Top + MathF.Abs(VirtualDesktop.Bottom - VirtualDesktop.Top) / 2;
+                float lx = _virtualDesktop.Left + MathF.Abs(_virtualDesktop.Right - _virtualDesktop.Left) / 2;
+                float ly = _virtualDesktop.Top + MathF.Abs(_virtualDesktop.Bottom - _virtualDesktop.Top) / 2;
 
                 float dx = cx - lx;
                 float dy = cy - ly;
 
-                float halfWidth = (VirtualDesktop.Right - VirtualDesktop.Left) / 2f;
+                float halfWidth = (_virtualDesktop.Right - _virtualDesktop.Left) / 2f;
                 float eyeDistance = halfWidth / MathF.Tan(70f * MathF.PI / 180f);
                 float azimuth = MathF.Atan2(dx, eyeDistance) * 180.0f / MathF.PI;
                 float distance = MathF.Sqrt(dx * dx + dy * dy);

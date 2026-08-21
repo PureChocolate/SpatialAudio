@@ -1,15 +1,14 @@
 ﻿using NAudio.CoreAudioApi;
 using NAudio.Wave;
-using SpatialAudio;
 using System;
 using System.Runtime.InteropServices;
 
-namespace Audio{
+namespace SpatialAudio{
     class Program{
-        const string RESET = "\x1b[0m";
-        const string DIM = "\x1b[2m";
-        const string BLUE = "\x1b[34m";
-        const string GREEN = "\x1b[32m";
+        const string Reset = "\x1b[0m";
+        const string Dim = "\x1b[2m";
+        const string Blue = "\x1b[34m";
+        const string Green = "\x1b[32m";
 
         [DllImport("kernel32.dll")]
         static extern IntPtr GetStdHandle(int nStdHandle);
@@ -48,7 +47,7 @@ namespace Audio{
                 Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");
             }
         }
-
+        // Audio generation test, kept for future reference.
         static byte[] MakeClickTrain() {
             WaveFormat wave = WaveFormat.CreateIeeeFloatWaveFormat(48000, 2);
 
@@ -94,9 +93,9 @@ namespace Audio{
                 {
                     BufferedWaveProvider bufferedWave = new BufferedWaveProvider(capture.WaveFormat);
                     bufferedWave.DiscardOnBufferOverflow = true;
-                    capture.DataAvailable += onDataAvailable;
+                    capture.DataAvailable += OnDataAvailable;
 
-                    void onDataAvailable(object? sender, WaveInEventArgs e)
+                    void OnDataAvailable(object? sender, WaveInEventArgs e)
                     {
                         float[] chunk = new float[e.BytesRecorded / 4];
                         Buffer.BlockCopy(e.Buffer, 0, chunk, 0, e.BytesRecorded);
@@ -112,7 +111,7 @@ namespace Audio{
                     output.Init(bufferedWave);
                     output.Play();
                     Console.WriteLine();
-                    Console.WriteLine($"{DIM}CAPTURE: {devices[c - 1].FriendlyName}  ->  OUTPUT: {devices[o - 1].FriendlyName}{RESET}");
+                    Console.WriteLine($"{Dim}CAPTURE: {devices[c - 1].FriendlyName}  ->  OUTPUT: {devices[o - 1].FriendlyName}{Reset}");
                     Console.WriteLine();
 
                     int readoutRow = Console.CursorTop;
@@ -124,10 +123,10 @@ namespace Audio{
                         var (az, dist, title) = WindowTracker.GetFocusedInfo();
                         Spatializer.CurrentAzimuthDeg = az;
                         if (title.Length > 40) title = title.Substring(0, 40);
-                        string color = az < 0 ? BLUE : GREEN;
+                        string color = az < 0 ? Blue : Green;
                         string side = az < 0 ? "left" : "right";
                         string visibleLine = $"{title,-40} -> {az:F1} deg {side}, {dist:F0}px";
-                        string line = $"{title,-40} -> {color}{az:F1} deg {side}{RESET}, {DIM}{dist:F0}px{RESET}";
+                        string line = $"{title,-40} -> {color}{az:F1} deg {side}{Reset}, {Dim}{dist:F0}px{Reset}";
                         int pad = 110 - visibleLine.Length;
                         if (pad > 0) line += new string(' ', pad);
                         if (line != lastLine)
