@@ -5,6 +5,8 @@
         public static float CurrentAzimuthDeg { get; set; }
         private static float[] _ring = new float[32];
         private static int _ringPos = 0;
+        private static float[] _hrtfRing = new float[512];
+        private static int _hrtfPos = 0;
 
         public static void Process(float[] samples, int sampleRate, float azimuthDeg)
         {
@@ -38,7 +40,13 @@
                 for(int k = 0; k < h.Length; k++)
                 {
                     if (i - k >= 0) processed[i] += h[k] * x[i - k];
+                    else processed[i] += h[k] * _hrtfRing[(_hrtfPos - (k - i) + _hrtfRing.Length) % _hrtfRing.Length];
                 }
+            }
+            for(int j = 0; j < x.Length; j++)
+            {
+                _hrtfRing[_hrtfPos] = x[j];
+                _hrtfPos = (_hrtfPos + 1) % _hrtfRing.Length;
             }
             return processed;
         }

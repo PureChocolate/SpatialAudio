@@ -60,6 +60,18 @@ namespace SpatialAudio{
                 float[] yB = Spatializer.HRTFProcess(h, half);
                 Console.WriteLine("Test B y[0..2]: " + string.Join(", ", yB.Take(3).Select(f => f.ToString("E1"))));
 
+                // Card 2 Test
+                float[] impulse2 = new float[512];
+                Array.Fill(impulse2, 1f);
+                float[] a2 = Spatializer.HRTFProcess(h, impulse2);
+                Console.WriteLine("Test A2 y[0..7]: " + string.Join(", ", a2.Take(8).Select(f => f.ToString("E1"))));
+
+                float[] half2 = new float[512];
+                float[] b2 = Spatializer.HRTFProcess(h, half2);
+                Console.WriteLine("Test B2 y[0..2]: " + string.Join(", ", b2.Take(3).Select(f => f.ToString("E1"))));
+
+
+
                 // Piece 1 regression — the loader must not have moved
                 float[] data = HrtfDatabase.GetIr(40, 289, "L");
                 Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");
