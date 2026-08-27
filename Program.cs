@@ -43,6 +43,24 @@ namespace SpatialAudio{
             else if(c == 2)
             {
                 HrtfDatabase.ReadData();
+
+                // Card 1 verify — replay the KEMAR experiment
+                float[] h = HrtfDatabase.GetIr(0, 45, "L");
+
+                // Test A: impulse in -> h out (definition of impulse response)
+                float[] impulse = new float[512];
+                impulse[0] = 1f;
+                float[] yA = Spatializer.HRTFProcess(h, impulse);
+                Console.WriteLine("Test A y[0..7]: " + string.Join(", ", yA.Take(8).Select(f => f.ToString("E1"))));
+
+                // Test B: click + half-strength echo
+                float[] half = new float[512];
+                half[0] = 1f;
+                half[1] = 0.5f;
+                float[] yB = Spatializer.HRTFProcess(h, half);
+                Console.WriteLine("Test B y[0..2]: " + string.Join(", ", yB.Take(3).Select(f => f.ToString("E1"))));
+
+                // Piece 1 regression — the loader must not have moved
                 float[] data = HrtfDatabase.GetIr(40, 289, "L");
                 Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");
             }

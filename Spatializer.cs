@@ -29,5 +29,18 @@
                 _ringPos = (_ringPos + 1) % _ring.Length;
             }
         }
+
+        public static float[] HRTFProcess(float[] h, float[] x)
+        {
+            float[] processed = new float[x.Length];
+            for(int i = 0; i < processed.Length; i++)
+            {
+                for(int k = 0; k < h.Length; k++)
+                {
+                    if (i - k >= 0) processed[i] += h[k] * x[i - k];
+                }
+            }
+            return processed;
+        }
     }
 }
