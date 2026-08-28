@@ -45,30 +45,47 @@ namespace SpatialAudio{
                 HrtfDatabase.ReadData();
 
                 // Card 1 verify — replay the KEMAR experiment
-                float[] h = HrtfDatabase.GetIr(0, 45, "L");
+                float[] h0 = HrtfDatabase.GetIr(0, 45, "L");
+                float[] hR0 = HrtfDatabase.GetIr(0, 45, "R");
+
+                float sumH = h0.Sum(x => MathF.Abs(x));
+                float sumHR = hR0.Sum(x => MathF.Abs(x));
+                
+                //normalize data sets.
+                float[] h = sumH == 0 ? h0 : h0.Select(x => x / sumH).ToArray();
+                float[] hR = sumHR == 0 ? hR0 : hR0.Select(x => x / sumHR).ToArray();
+
+                //Card 3 test
+                float[] nH = new float[512];
+                nH[0] = 1f;
+                nH[1] = 1f;
+                float[] c0= Spatializer.HRTFProcess(h, hR, nH);
+                Console.WriteLine("Test C y[0..7]: " + string.Join(", ", c0.Take(8).Select(f => f.ToString("E1"))));
 
                 // Test A: impulse in -> h out (definition of impulse response)
                 float[] impulse = new float[512];
                 impulse[0] = 1f;
-                float[] yA = Spatializer.HRTFProcess(h, impulse);
+                float[] yA = Spatializer.HRTFProcess(h,hR, impulse);
                 Console.WriteLine("Test A y[0..7]: " + string.Join(", ", yA.Take(8).Select(f => f.ToString("E1"))));
 
                 // Test B: click + half-strength echo
                 float[] half = new float[512];
                 half[0] = 1f;
                 half[1] = 0.5f;
-                float[] yB = Spatializer.HRTFProcess(h, half);
+                float[] yB = Spatializer.HRTFProcess(h,hR, half);
                 Console.WriteLine("Test B y[0..2]: " + string.Join(", ", yB.Take(3).Select(f => f.ToString("E1"))));
 
                 // Card 2 Test
                 float[] impulse2 = new float[512];
                 Array.Fill(impulse2, 1f);
-                float[] a2 = Spatializer.HRTFProcess(h, impulse2);
+                float[] a2 = Spatializer.HRTFProcess(h,hR, impulse2);
                 Console.WriteLine("Test A2 y[0..7]: " + string.Join(", ", a2.Take(8).Select(f => f.ToString("E1"))));
 
                 float[] half2 = new float[512];
-                float[] b2 = Spatializer.HRTFProcess(h, half2);
+                float[] b2 = Spatializer.HRTFProcess(h,hR, half2);
                 Console.WriteLine("Test B2 y[0..2]: " + string.Join(", ", b2.Take(3).Select(f => f.ToString("E1"))));
+
+                Console.WriteLine($"Sum H: {sumH}, Sum HR: {sumHR}");
 
 
 
@@ -121,12 +138,14 @@ namespace SpatialAudio{
                 int o = -1;
                 if (int.TryParse(Console.ReadLine(), out o) && o != c && 1 <= o && o <= devices.Count)
                 {
+                    //Capture buffer provider, sign up for notify with += for data available
                     BufferedWaveProvider bufferedWave = new BufferedWaveProvider(capture.WaveFormat);
                     bufferedWave.DiscardOnBufferOverflow = true;
                     capture.DataAvailable += OnDataAvailable;
 
                     void OnDataAvailable(object? sender, WaveInEventArgs e)
                     {
+                        //480 frames of data, interlved so stereo channel = 960 floats/3840 Bytes
                         float[] chunk = new float[e.BytesRecorded / 4];
                         Buffer.BlockCopy(e.Buffer, 0, chunk, 0, e.BytesRecorded);
                         Spatializer.Process(chunk, capture.WaveFormat.SampleRate, Spatializer.CurrentAzimuthDeg);
