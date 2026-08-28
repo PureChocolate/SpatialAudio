@@ -18,6 +18,7 @@ namespace SpatialAudio{
 
         [DllImport("kernel32.dll")]
         static extern bool SetConsoleMode(IntPtr handle, uint mode);
+        private static float[] chunk = new float[960];
 
         static void EnableAnsiColors()
         {
@@ -33,17 +34,18 @@ namespace SpatialAudio{
             EnableAnsiColors();
             WindowTracker.ListMonitors();
 
+            HrtfDatabase.ReadData();
             Console.WriteLine("Choose run: 1. Standard audio spatializer, 2. HRTF Testing");
+            Spatializer.LoadHRTF(0, 270);
 
             int.TryParse(Console.ReadLine(), out int c);
             if(c == 1)
             {
+
                 RunCapture();
             }
             else if(c == 2)
             {
-                HrtfDatabase.ReadData();
-
                 // Card 1 verify — replay the KEMAR experiment
                 float[] h0 = HrtfDatabase.GetIr(0, 45, "L");
                 float[] hR0 = HrtfDatabase.GetIr(0, 45, "R");
@@ -59,30 +61,35 @@ namespace SpatialAudio{
                 float[] nH = new float[512];
                 nH[0] = 1f;
                 nH[1] = 1f;
-                float[] c0= Spatializer.HRTFProcess(h, hR, nH);
+                float[] c0 = new float[512];
+                Spatializer.HRTFProcess(nH, c0);
                 Console.WriteLine("Test C y[0..7]: " + string.Join(", ", c0.Take(8).Select(f => f.ToString("E1"))));
 
                 // Test A: impulse in -> h out (definition of impulse response)
                 float[] impulse = new float[512];
                 impulse[0] = 1f;
-                float[] yA = Spatializer.HRTFProcess(h,hR, impulse);
+                float[] yA = new float[512];
+                Spatializer.HRTFProcess(impulse, yA);
                 Console.WriteLine("Test A y[0..7]: " + string.Join(", ", yA.Take(8).Select(f => f.ToString("E1"))));
 
                 // Test B: click + half-strength echo
                 float[] half = new float[512];
                 half[0] = 1f;
                 half[1] = 0.5f;
-                float[] yB = Spatializer.HRTFProcess(h,hR, half);
+                float[] yB = new float[512];
+                Spatializer.HRTFProcess(half, yB);
                 Console.WriteLine("Test B y[0..2]: " + string.Join(", ", yB.Take(3).Select(f => f.ToString("E1"))));
 
                 // Card 2 Test
                 float[] impulse2 = new float[512];
                 Array.Fill(impulse2, 1f);
-                float[] a2 = Spatializer.HRTFProcess(h,hR, impulse2);
+                float[] a2 = new float[512];
+                Spatializer.HRTFProcess(impulse2, a2);
                 Console.WriteLine("Test A2 y[0..7]: " + string.Join(", ", a2.Take(8).Select(f => f.ToString("E1"))));
 
                 float[] half2 = new float[512];
-                float[] b2 = Spatializer.HRTFProcess(h,hR, half2);
+                float[] b2 = new float[512];
+                Spatializer.HRTFProcess(half2, b2);
                 Console.WriteLine("Test B2 y[0..2]: " + string.Join(", ", b2.Take(3).Select(f => f.ToString("E1"))));
 
                 Console.WriteLine($"Sum H: {sumH}, Sum HR: {sumHR}");
@@ -142,16 +149,12 @@ namespace SpatialAudio{
                     BufferedWaveProvider bufferedWave = new BufferedWaveProvider(capture.WaveFormat);
                     bufferedWave.DiscardOnBufferOverflow = true;
                     capture.DataAvailable += OnDataAvailable;
-
                     void OnDataAvailable(object? sender, WaveInEventArgs e)
                     {
                         //480 frames of data, interlved so stereo channel = 960 floats/3840 Bytes
-                        float[] chunk = new float[e.BytesRecorded / 4];
+                        if (e.BytesRecorded != chunk.Length * 4) chunk = new float[e.BytesRecorded / 4];
                         Buffer.BlockCopy(e.Buffer, 0, chunk, 0, e.BytesRecorded);
-                        Spatializer.Process(chunk, capture.WaveFormat.SampleRate, Spatializer.CurrentAzimuthDeg);
-                        byte[] processed = new byte[e.BytesRecorded];
-                        Buffer.BlockCopy(chunk, 0, processed, 0, e.BytesRecorded);
-                        bufferedWave.AddSamples(processed, 0, e.BytesRecorded);
+                        bufferedWave.AddSamples(Spatializer.Process(chunk, capture.WaveFormat.SampleRate, Spatializer.CurrentAzimuthDeg), 0, e.BytesRecorded);
                     }
 
                     capture.StartRecording();

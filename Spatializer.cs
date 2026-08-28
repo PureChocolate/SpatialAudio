@@ -1,4 +1,6 @@
-﻿namespace SpatialAudio
+﻿using System.Runtime.InteropServices;
+
+namespace SpatialAudio
 {
     internal static class Spatializer
     {
@@ -10,56 +12,48 @@
         private static float[] _hrtfRingR = new float[512];
         private static int _hrtfPosL = 0;
         private static int _hrtfPosR = 0;
+        private static float[] _hL = new float[512];
+        private static float[] _hR = new float[512];
+        private static float[] _scratch = new float[960];
+        private static byte[] _processed = new byte[_scratch.Length * 4];
 
-        public static void Process(float[] samples, int sampleRate, float azimuthDeg)
+        public static byte[] Process(float[] samples, int sampleRate, float azimuthDeg)
         {
-            float azRad = azimuthDeg * MathF.PI / 180f;
-            int delay = (int)MathF.Round(30f * MathF.Sin(MathF.Abs(azRad)));
-            if (delay > _ring.Length - 1) delay = _ring.Length - 1;
-
-            int delayedIndex = azRad < 0 ? 1 : 0;
-
-            float pan = Math.Clamp(azRad, -MathF.PI / 2f, MathF.PI / 2f);
-            float leftGain = MathF.Cos( pan / 2f + MathF.PI / 4f);
-            float rightGain = MathF.Sin(pan / 2f + MathF.PI / 4f);
-
-            // Process 960 samples, 2 per loop hence /2.
-            for (int i = 0; i < samples.Length / 2; i++)
+            if(samples.Length != _scratch.Length)
             {
-                //apply gains per channel
-                int delayedChannel = i * 2 + delayedIndex;
-                samples[i * 2] *= leftGain;
-                samples[i * 2 + 1] *= rightGain;
-
-                //write data to ring buffer, read previous data(sound that arrives "late"/the other ear into sample from buffer, update position
-                _ring[_ringPos] = samples[delayedChannel];
-                samples[delayedChannel] = _ring[(_ringPos - delay + _ring.Length) % _ring.Length];
-                _ringPos = (_ringPos + 1) % _ring.Length;
+                _scratch = new float[samples.Length];
+                _processed = new byte[_scratch.Length * 4];
             }
+            HRTFProcess(samples, _scratch);
+            Buffer.BlockCopy(_scratch, 0, _processed,0,_scratch.Length*4);
+            return _processed;
         }
 
-        public static float[] HRTFProcess(float[] h, float[] hR, float[] x)
+        //dest is constructed to match size of x in previous method before call
+        public static void HRTFProcess(float[] x, float[] dest)
         {
-            float[] processed = new float[x.Length];
+            Array.Clear(dest, 0, dest.Length);
             //L channel
-            for(int i = 0; i < processed.Length; i += 2)
+            for(int i = 0; i < dest.Length; i += 2)
             {
-                for(int k = 0; k < h.Length; k++)
+                for(int k = 0; k < _hL.Length; k++)
                 {
-                    if (i - (2*k) >= 0) processed[i] += h[k] * x[i - k*2]; // 2k because we are going by frames, data stream is interleved so 2 points = 1 frame
+                    if (i - (2*k) >= 0) dest[i] += _hL[k] * x[i - k*2]; // 2k because we are going by frames, data stream is interleved so 2 points = 1 frame
                     // we want the data from k-th frame back, i/2 gives current frame read, k-i/2 becomes -1,-2 etc and pos-1 is where the last data lives so we read perfectly % is just to wrap if we underflow.
-                    else processed[i] += h[k] * _hrtfRingL[(_hrtfPosL - (k - i/2) + _hrtfRingL.Length) % _hrtfRingL.Length];
+                    else dest[i] += _hL[k] * _hrtfRingL[(_hrtfPosL - (k - i/2) + _hrtfRingL.Length) % _hrtfRingL.Length];
                 }
+                dest[i] *= 2;
             }
 
             //R channel
-            for (int i = 1; i < processed.Length; i += 2)
+            for (int i = 1; i < dest.Length; i += 2)
             {
-                for (int k = 0; k < hR.Length; k++)
+                for (int k = 0; k < _hR.Length; k++)
                 {
-                    if (i - (2 * k) >= 0) processed[i] += hR[k] * x[i - 2*k];
-                    else processed[i] += hR[k] * _hrtfRingR[(_hrtfPosR - (k - i/2) + _hrtfRingR.Length) % _hrtfRingR.Length];
+                    if (i - (2 * k) >= 0) dest[i] += _hR[k] * x[i - 2*k];
+                    else dest[i] += _hR[k] * _hrtfRingR[(_hrtfPosR - (k - i/2) + _hrtfRingR.Length) % _hrtfRingR.Length];
                 }
+                dest[i] *= 2;
             }
 
             //Update rings, Push new/current data after process so we dont get current data overlap when reading back
@@ -70,8 +64,18 @@
                 _hrtfRingR[_hrtfPosR] = x[j + 1];
                 _hrtfPosR = (_hrtfPosR + 1) % _hrtfRingR.Length;
             }
+        }
 
-            return processed;
+        public static void LoadHRTF(int ele, int az)
+        {
+            _hL = HrtfDatabase.GetIr(ele,az,"L");
+            _hR = HrtfDatabase.GetIr(ele, az, "R");
+
+            float sL = _hL.Sum(x => MathF.Abs(x));
+            float sR = _hR.Sum(x => MathF.Abs(x));
+
+            _hL = sL == 0 ? _hL : _hL.Select(x => x / sL).ToArray();
+            _hR = sR == 0 ? _hR : _hR.Select(x => x / sR).ToArray();
         }
     }
 }
