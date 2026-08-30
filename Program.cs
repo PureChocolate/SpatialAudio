@@ -35,7 +35,7 @@ namespace SpatialAudio{
             WindowTracker.ListMonitors();
 
             HrtfDatabase.ReadData();
-            Console.WriteLine("Choose run: 1. Standard audio spatializer, 2. HRTF Testing");
+            Console.WriteLine("Choose run: 1. Standard audio spatializer, 2. HRTF Testing, 3.FFT Testing");
             Spatializer.LoadHRTF(0, 270);
 
             int.TryParse(Console.ReadLine(), out int c);
@@ -46,6 +46,7 @@ namespace SpatialAudio{
             }
             else if(c == 2)
             {
+                Spatializer.LoadHRTF(0, 45);
                 // Card 1 verify — replay the KEMAR experiment
                 float[] h0 = HrtfDatabase.GetIr(0, 45, "L");
                 float[] hR0 = HrtfDatabase.GetIr(0, 45, "R");
@@ -99,6 +100,45 @@ namespace SpatialAudio{
                 // Piece 1 regression — the loader must not have moved
                 float[] data = HrtfDatabase.GetIr(40, 289, "L");
                 Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");
+            } else if(c == 3)
+            {
+                float[][] x = new float[][]
+                {
+                    new float[8], new float[8], new float[8]
+                };
+                x[0][0] = 1f;
+                for (int v = 0; v < x[0].Length; v++)
+                {
+                    x[1][v] = MathF.Cos(2 * MathF.PI * 1 * v / x[1].Length);
+                    x[2][v] = MathF.Sin(2 * MathF.PI * 1 * v / x[1].Length);
+                }
+                foreach (float[] a in x)
+                {
+                    foreach (float p in a) Console.Write($"{p}, ");
+
+                    Console.WriteLine("Next impulse");
+                    for (int k = 0; k < a.Length; k++)
+                    {
+                        (float f, float g) = Spatializer.Probes(a, k);
+                        // Piece 3 WIP — FFTProcess disabled (resume path in LEARNING.md)
+                        //(float eK, float oK) = Spatializer.FFTProcess(a, k);
+                        Console.WriteLine($"k: {k}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+                        //Console.WriteLine($"k: {k}, x[K]: {eK + }, plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+                    }
+                }
+                //float[] x = new float[512];
+                //for(int n = 0; n < x.Length; n++)
+                //{
+                //    x[n] = MathF.Cos(2 * MathF.PI * 15 * ((float)n / x.Length));
+                //}
+                //(float f, float g) = Spatializer.Probes(x, 0);
+                //Console.WriteLine($"k: {0}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+                //(f,g) = Spatializer.Probes(x, 15);
+                //Console.WriteLine($"k: {15}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+                //(f,g) = Spatializer.Probes(x, 497);
+                //Console.WriteLine($"k: {497}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+
+                
             }
         }
         // Audio generation test, kept for future reference.

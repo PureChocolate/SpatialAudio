@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 
 namespace SpatialAudio
 {
@@ -77,5 +78,51 @@ namespace SpatialAudio
             _hL = sL == 0 ? _hL : _hL.Select(x => x / sL).ToArray();
             _hR = sR == 0 ? _hR : _hR.Select(x => x / sR).ToArray();
         }
+
+        public static (float,float) Probes(float[] x, int k)
+        {
+            float sum = 0;
+            float sumS = 0;
+            for (int n = 0; n < x.Length; n++) {
+                sum += x[n] * MathF.Cos(2 * MathF.PI * k * ((float)n / x.Length));
+                sumS += x[n] * MathF.Sin(2 * MathF.PI * k * ((float)n / x.Length));
+            }
+
+            return (sum,sumS);
+        }
+
+        // Piece 3 WIP (disabled 2026-08-25 — resume point: N=2 by hand, then N=4/8/512
+        // against the direct DFT in Probes). The recursion must pass the sub-(re/ im)
+        // arrays into itself, and the split/butterfly combination loop is still
+        // unwritten. See LEARNING.md M3 section for the full resume path.
+        //public static (float[], float[]) FFTProcess(float[] x, float[] re, float[] im)
+        //{
+        //    if (x.Length == 1) return (re, im);
+        //    float[] eRe = new float[re.Length / 2];
+        //    float[] eIm = new float[im.Length / 2];
+        //    float[] oRe = new float[re.Length / 2];
+        //    float[] oIm = new float[im.Length / 2];
+        //    for (int i = 0; i < re.Length / 2; i++)
+        //    {
+        //        eRe[i] = re[2 * i];
+        //        eIm[i] = im[2 * i];
+        //        oRe[i] = re[(2 * i) + 1];
+        //        oIm[i] = im[(2 * i) + 1];
+        //    }
+        //    float[] fX = x[0..(x.Length / 2)];
+        //    float[] sX = x[(x.Length / 2)..];
+        //    (float[] eR, float[] Ei) = FFTProcess(x, eRe, eIm);
+        //    (float[] oR, float[] oI) = FFTProcess(x, oRe, oIm);
+
+        //    //for(int n = 0; n < x.Length / 2 - 1; n++)
+        //    //{
+        //    //    float w = MathF.Pow(MathF.E, -2 * MathF.PI * k * (n / (float)(x.Length / 2)));
+        //    //    eK += x[2 * n] * w;
+        //    //    oK += x[(2 * n)+ 1] * w;
+        //    //}
+
+        //    //return (eK, oK);
+        //    return (eRe, eIm);
+        //}
     }
 }
