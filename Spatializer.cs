@@ -91,38 +91,42 @@ namespace SpatialAudio
             return (sum,sumS);
         }
 
-        // Piece 3 WIP (disabled 2026-08-25 — resume point: N=2 by hand, then N=4/8/512
-        // against the direct DFT in Probes). The recursion must pass the sub-(re/ im)
-        // arrays into itself, and the split/butterfly combination loop is still
-        // unwritten. See LEARNING.md M3 section for the full resume path.
-        //public static (float[], float[]) FFTProcess(float[] x, float[] re, float[] im)
-        //{
-        //    if (x.Length == 1) return (re, im);
-        //    float[] eRe = new float[re.Length / 2];
-        //    float[] eIm = new float[im.Length / 2];
-        //    float[] oRe = new float[re.Length / 2];
-        //    float[] oIm = new float[im.Length / 2];
-        //    for (int i = 0; i < re.Length / 2; i++)
-        //    {
-        //        eRe[i] = re[2 * i];
-        //        eIm[i] = im[2 * i];
-        //        oRe[i] = re[(2 * i) + 1];
-        //        oIm[i] = im[(2 * i) + 1];
-        //    }
-        //    float[] fX = x[0..(x.Length / 2)];
-        //    float[] sX = x[(x.Length / 2)..];
-        //    (float[] eR, float[] Ei) = FFTProcess(x, eRe, eIm);
-        //    (float[] oR, float[] oI) = FFTProcess(x, oRe, oIm);
+        // Radix-2 FFT (decimation in time): even/odd parity split per level, recursion
+        // to N=1, butterfly X[k] = E + w^k·O, X[k+N/2] = E − w^k·O. N = re.Length.
+        // Verified vs the direct DFT (Probes) at N=8 (impulse/cos1/sin1); N=512 check pending.
+        public static (float[], float[]) FFTProcess(float[] re, float[] im)
+        {
+            if (re.Length == 1) return (re, im);
+            float[] eRe = new float[re.Length / 2];
+            float[] eIm = new float[im.Length / 2];
+            float[] oRe = new float[re.Length / 2];
+            float[] oIm = new float[im.Length / 2];
+            for (int i = 0; i < re.Length / 2; i++)
+            {
+                eRe[i] = re[2 * i];
+                eIm[i] = im[2 * i];
+                oRe[i] = re[(2 * i) + 1];
+                oIm[i] = im[(2 * i) + 1];
+            }
+            (float[] eR, float[] Ei) = FFTProcess(eRe, eIm);
+            (float[] oR, float[] oI) = FFTProcess(oRe, oIm);
 
-        //    //for(int n = 0; n < x.Length / 2 - 1; n++)
-        //    //{
-        //    //    float w = MathF.Pow(MathF.E, -2 * MathF.PI * k * (n / (float)(x.Length / 2)));
-        //    //    eK += x[2 * n] * w;
-        //    //    oK += x[(2 * n)+ 1] * w;
-        //    //}
+            float[] outRe = new float[re.Length];
+            float[] outIm = new float[re.Length];
+            for(int k = 0; k < re.Length/2; k++)
+            {
+                float wR = MathF.Cos(-2f * MathF.PI * k / re.Length);
+                float wI = MathF.Sin(-2f * MathF.PI * k / re.Length);
+                float tR = wR * oR[k] - wI * oI[k];
+                float tI = wR * oI[k] + wI * oR[k];
+                outRe[k] = eR[k] + tR;
+                outIm[k] = Ei[k] + tI;
+                outRe[k + re.Length/2] = eR[k] - tR;
+                outIm[k + re.Length / 2] = Ei[k] - tI;
+            }
 
-        //    //return (eK, oK);
-        //    return (eRe, eIm);
-        //}
+            //return (eK, oK);
+            return (outRe,outIm);
+        }
     }
 }

@@ -121,9 +121,9 @@ namespace SpatialAudio{
                     {
                         (float f, float g) = Spatializer.Probes(a, k);
                         // Piece 3 WIP — FFTProcess disabled (resume path in LEARNING.md)
-                        //(float eK, float oK) = Spatializer.FFTProcess(a, k);
+                        (float[] ffRe, float[] ffIm) = Spatializer.FFTProcess(a, new float[a.Length]);
                         Console.WriteLine($"k: {k}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
-                        //Console.WriteLine($"k: {k}, x[K]: {eK + }, plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+                        Console.WriteLine($"k: {k}, (ffRe, ffIm): ({ffRe[k]},{ffIm[k]}) plus |x| = {MathF.Sqrt((ffRe[k] * ffRe[k]) + (ffIm[k] * ffIm[k]))}");
                     }
                 }
                 //float[] x = new float[512];
