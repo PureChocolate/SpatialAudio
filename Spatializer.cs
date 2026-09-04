@@ -84,8 +84,8 @@ namespace SpatialAudio
             float sum = 0;
             float sumS = 0;
             for (int n = 0; n < x.Length; n++) {
-                sum += x[n] * MathF.Cos(2 * MathF.PI * k * ((float)n / x.Length));
-                sumS += x[n] * MathF.Sin(2 * MathF.PI * k * ((float)n / x.Length));
+                sum += x[n] * (float)Math.Cos(2 * Math.PI * k * ((double)n / x.Length));
+                sumS += x[n] * (float)Math.Sin(2 * Math.PI * k * ((double)n / x.Length));
             }
 
             return (sum,sumS);
@@ -93,9 +93,13 @@ namespace SpatialAudio
 
         // Radix-2 FFT (decimation in time): even/odd parity split per level, recursion
         // to N=1, butterfly X[k] = E + w^k·O, X[k+N/2] = E − w^k·O. N = re.Length.
-        // Verified vs the direct DFT (Probes) at N=8 (impulse/cos1/sin1); N=512 check pending.
+        // Verified vs the direct DFT (Probes): N=8 tables (impulse/cos1/sin1) and
+        // N=512 random max-diff ~2e-5 (mode 3 harness). Note: the FFT is MORE accurate
+        // than the direct reference — Probes needs double-precision angles because its
+        // k·n arguments run far beyond float32's precision (k up to 511, n up to 511).
         public static (float[], float[]) FFTProcess(float[] re, float[] im)
         {
+            //Seperate into even odds arrays, so we "alternate" the data that gets shifted every pass.
             if (re.Length == 1) return (re, im);
             float[] eRe = new float[re.Length / 2];
             float[] eIm = new float[im.Length / 2];
@@ -108,24 +112,31 @@ namespace SpatialAudio
                 oRe[i] = re[(2 * i) + 1];
                 oIm[i] = im[(2 * i) + 1];
             }
+
+            //process out arrays to generate real, imaginary arrays on even and odd
             (float[] eR, float[] Ei) = FFTProcess(eRe, eIm);
             (float[] oR, float[] oI) = FFTProcess(oRe, oIm);
 
             float[] outRe = new float[re.Length];
             float[] outIm = new float[re.Length];
+
+            //combine and do the final calculation
             for(int k = 0; k < re.Length/2; k++)
             {
+                //angle calculation/the shift for the point
                 float wR = MathF.Cos(-2f * MathF.PI * k / re.Length);
                 float wI = MathF.Sin(-2f * MathF.PI * k / re.Length);
+                //shift the points 
                 float tR = wR * oR[k] - wI * oI[k];
                 float tI = wR * oI[k] + wI * oR[k];
+                //combine the even and odd parts for the first half, evens are the baseline to measure the shift of odd's
                 outRe[k] = eR[k] + tR;
                 outIm[k] = Ei[k] + tI;
+                //fill out the 2nd half of the data since its 180 degree flip
+                //cos(x + 180) = -cos(x), sin(x+180) = -sin(x), and tR is x coord tI is y cord, (cos,sin)
                 outRe[k + re.Length/2] = eR[k] - tR;
                 outIm[k + re.Length / 2] = Ei[k] - tI;
             }
-
-            //return (eK, oK);
             return (outRe,outIm);
         }
     }

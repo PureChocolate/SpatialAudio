@@ -104,7 +104,7 @@ namespace SpatialAudio{
             {
                 float[][] x = new float[][]
                 {
-                    new float[8], new float[8], new float[8]
+                    new float[8], new float[8], new float[8], new float[512]
                 };
                 x[0][0] = 1f;
                 for (int v = 0; v < x[0].Length; v++)
@@ -112,19 +112,26 @@ namespace SpatialAudio{
                     x[1][v] = MathF.Cos(2 * MathF.PI * 1 * v / x[1].Length);
                     x[2][v] = MathF.Sin(2 * MathF.PI * 1 * v / x[1].Length);
                 }
+                for (int i = 0; i < x[3].Length; i++)
+                {
+                    x[3][i] = ((Random.Shared.NextSingle() * 2.0f) - 1.0f);
+                }
                 foreach (float[] a in x)
                 {
-                    foreach (float p in a) Console.Write($"{p}, ");
-
+                    //foreach (float p in a) Console.Write($"{p}, ");
+                    float maxDiff = 0;
                     Console.WriteLine("Next impulse");
                     for (int k = 0; k < a.Length; k++)
                     {
                         (float f, float g) = Spatializer.Probes(a, k);
-                        // Piece 3 WIP — FFTProcess disabled (resume path in LEARNING.md)
                         (float[] ffRe, float[] ffIm) = Spatializer.FFTProcess(a, new float[a.Length]);
-                        Console.WriteLine($"k: {k}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
-                        Console.WriteLine($"k: {k}, (ffRe, ffIm): ({ffRe[k]},{ffIm[k]}) plus |x| = {MathF.Sqrt((ffRe[k] * ffRe[k]) + (ffIm[k] * ffIm[k]))}");
+                        float dRe = MathF.Abs(f - ffRe[k]);
+                        float dIm = MathF.Abs(g + ffIm[k]);
+                        maxDiff = MathF.Max(maxDiff, MathF.MaxMagnitude(dIm, dRe));
+                        //Console.WriteLine($"k: {k}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
+                        //Console.WriteLine($"k: {k}, (ffRe, ffIm): ({ffRe[k]},{ffIm[k]}) plus |x| = {MathF.Sqrt((ffRe[k] * ffRe[k]) + (ffIm[k] * ffIm[k]))}");
                     }
+                    Console.WriteLine($"MaxDiff: {maxDiff}");
                 }
                 //float[] x = new float[512];
                 //for(int n = 0; n < x.Length; n++)
