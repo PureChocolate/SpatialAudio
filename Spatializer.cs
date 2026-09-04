@@ -139,5 +139,83 @@ namespace SpatialAudio
             }
             return (outRe,outIm);
         }
+
+        public static (float[], float[]) IFFTProcess(float[] re, float[] im)
+        {
+            if (re.Length == 1) return (re, im);
+            float[] eRe = new float[re.Length / 2];
+            float[] eIm = new float[im.Length / 2];
+            float[] oRe = new float[re.Length / 2];
+            float[] oIm = new float[im.Length / 2];
+            for (int i = 0; i < re.Length / 2; i++)
+            {
+                eRe[i] = re[2 * i];
+                eIm[i] = im[2 * i];
+                oRe[i] = re[(2 * i) + 1];
+                oIm[i] = im[(2 * i) + 1];
+            }
+
+            //process out arrays to generate real, imaginary arrays on even and odd
+            (float[] eR, float[] Ei) = IFFTProcess(eRe, eIm);
+            (float[] oR, float[] oI) = IFFTProcess(oRe, oIm);
+
+            float[] outRe = new float[re.Length];
+            float[] outIm = new float[re.Length];
+
+            //combine and do the final calculation
+            for (int k = 0; k < re.Length / 2; k++)
+            {
+                //angle calculation/the shift for the point
+                float wR = MathF.Cos(2f * MathF.PI * k / re.Length);
+                float wI = MathF.Sin(2f * MathF.PI * k / re.Length);
+                //shift the points 
+                float tR = wR * oR[k] - wI * oI[k];
+                float tI = wR * oI[k] + wI * oR[k];
+                //combine the even and odd parts for the first half, evens are the baseline to measure the shift of odd's
+                outRe[k] = eR[k] + tR;
+                outIm[k] = Ei[k] + tI;
+                //fill out the 2nd half of the data since its 180 degree flip
+                //cos(x + 180) = -cos(x), sin(x+180) = -sin(x), and tR is x coord tI is y cord, (cos,sin)
+                outRe[k + re.Length / 2] = eR[k] - tR;
+                outIm[k + re.Length / 2] = Ei[k] - tI;
+            }
+            return (outRe, outIm);
+        }
+
+        public static float[] OverlapAdd(float[] h, float[] x, int blockSize)
+        {
+            float[] output = new float[x.Length + h.Length - 1];
+            float[] h0 = new float[1024];
+            for (int i = 0; i < h.Length; i++)
+            {
+                h0[i] = h[i];
+            }
+            (float[] hRe, float[] hIm) = FFTProcess(h0, new float[h0.Length]);
+            for (int b = 0; b < x.Length; b += blockSize)
+            {
+                float[] bX = new float[1024];
+                Array.Copy(x, b, bX, 0, blockSize);
+                (float[] xRe, float[] xIm) = FFTProcess(bX, new float[bX.Length]);
+                float[] yR = new float[h0.Length];
+                float[] yI = new float[h0.Length];
+                for (int i = 0; i < yR.Length; i++)
+                {
+                    yR[i] = hRe[i] * xRe[i] - hIm[i] * xIm[i];
+                    yI[i] = hRe[i] * xIm[i] + hIm[i] * xRe[i];
+                }
+                (float[] yT, float[] yTI) = Spatializer.IFFTProcess(yR, yI);
+                for (int i = 0; i < yT.Length; i++)
+                {
+                    yT[i] /= yT.Length;
+                    yTI[i] /= yTI.Length;
+                }
+                for(int i = 0; i < 1024; i++)
+                {
+                    if(b+i < output.Length) output[b + i] += yT[i];
+                }
+            }
+
+            return output;
+        }
     }
 }

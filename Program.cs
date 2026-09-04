@@ -39,12 +39,12 @@ namespace SpatialAudio{
             Spatializer.LoadHRTF(0, 270);
 
             int.TryParse(Console.ReadLine(), out int c);
-            if(c == 1)
+            if (c == 1)
             {
 
                 RunCapture();
             }
-            else if(c == 2)
+            else if (c == 2)
             {
                 Spatializer.LoadHRTF(0, 45);
                 // Card 1 verify — replay the KEMAR experiment
@@ -53,7 +53,7 @@ namespace SpatialAudio{
 
                 float sumH = h0.Sum(x => MathF.Abs(x));
                 float sumHR = hR0.Sum(x => MathF.Abs(x));
-                
+
                 //normalize data sets.
                 float[] h = sumH == 0 ? h0 : h0.Select(x => x / sumH).ToArray();
                 float[] hR = sumHR == 0 ? hR0 : hR0.Select(x => x / sumHR).ToArray();
@@ -100,53 +100,109 @@ namespace SpatialAudio{
                 // Piece 1 regression — the loader must not have moved
                 float[] data = HrtfDatabase.GetIr(40, 289, "L");
                 Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");
-            } else if(c == 3)
+            }
+            else if (c == 3)
             {
-                float[][] x = new float[][]
+                //Card 1: FFT vs direct DFT (Probes) — max diff per test array
+                float[][] a =
                 {
                     new float[8], new float[8], new float[8], new float[512]
                 };
-                x[0][0] = 1f;
-                for (int v = 0; v < x[0].Length; v++)
+                a[0][0] = 1f;
+                for (int v = 0; v < a[1].Length; v++)
                 {
-                    x[1][v] = MathF.Cos(2 * MathF.PI * 1 * v / x[1].Length);
-                    x[2][v] = MathF.Sin(2 * MathF.PI * 1 * v / x[1].Length);
+                    a[1][v] = MathF.Cos(2 * MathF.PI * 1 * v / a[1].Length);
+                    a[2][v] = MathF.Sin(2 * MathF.PI * 1 * v / a[1].Length);
                 }
-                for (int i = 0; i < x[3].Length; i++)
+                for (int i = 0; i < a[3].Length; i++)
                 {
-                    x[3][i] = ((Random.Shared.NextSingle() * 2.0f) - 1.0f);
+                    a[3][i] = ((Random.Shared.NextSingle() * 2.0f) - 1.0f);
                 }
-                foreach (float[] a in x)
+                foreach (float[] t in a)
                 {
-                    //foreach (float p in a) Console.Write($"{p}, ");
                     float maxDiff = 0;
-                    Console.WriteLine("Next impulse");
-                    for (int k = 0; k < a.Length; k++)
+                    for (int k = 0; k < t.Length; k++)
                     {
-                        (float f, float g) = Spatializer.Probes(a, k);
-                        (float[] ffRe, float[] ffIm) = Spatializer.FFTProcess(a, new float[a.Length]);
-                        float dRe = MathF.Abs(f - ffRe[k]);
-                        float dIm = MathF.Abs(g + ffIm[k]);
-                        maxDiff = MathF.Max(maxDiff, MathF.MaxMagnitude(dIm, dRe));
-                        //Console.WriteLine($"k: {k}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
-                        //Console.WriteLine($"k: {k}, (ffRe, ffIm): ({ffRe[k]},{ffIm[k]}) plus |x| = {MathF.Sqrt((ffRe[k] * ffRe[k]) + (ffIm[k] * ffIm[k]))}");
+                        (float f, float g) = Spatializer.Probes(t, k);
+                        (float[] ffR, float[] ffI) = Spatializer.FFTProcess(t, new float[t.Length]);
+                        float dRe = MathF.Abs(f - ffR[k]);
+                        float dIm = MathF.Abs(g + ffI[k]);
+                        maxDiff = MathF.Max(maxDiff, MathF.Max(dIm, dRe));
                     }
-                    Console.WriteLine($"MaxDiff: {maxDiff}");
+                    Console.WriteLine($"Card1 MaxDiff: {maxDiff}");
                 }
-                //float[] x = new float[512];
-                //for(int n = 0; n < x.Length; n++)
-                //{
-                //    x[n] = MathF.Cos(2 * MathF.PI * 15 * ((float)n / x.Length));
-                //}
-                //(float f, float g) = Spatializer.Probes(x, 0);
-                //Console.WriteLine($"k: {0}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
-                //(f,g) = Spatializer.Probes(x, 15);
-                //Console.WriteLine($"k: {15}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
-                //(f,g) = Spatializer.Probes(x, 497);
-                //Console.WriteLine($"k: {497}, (F,G): ({f},{g}), plus |x| = {MathF.Sqrt((f * f) + (g * g))}");
 
-                
+                //Card 2a: roundtrip — IFFT(FFT(x)) = x, ÷N done in caller
+                float[] x = new float[512];
+                for (int i = 0; i < x.Length; i++)
+                {
+                    x[i] = ((Random.Shared.NextSingle() * 2.0f) - 1.0f);
+                }
+                (float[] ffRe, float[] ffIm) = Spatializer.FFTProcess(x, new float[x.Length]);
+                (float[] iffRe, float[] iffIm) = Spatializer.IFFTProcess(ffRe, ffIm);
+                float maxDiffIFFT = 0;
+                for (int i = 0; i < iffRe.Length; i++)
+                {
+                    iffRe[i] /= iffRe.Length;
+                    iffIm[i] /= iffIm.Length;
+                    maxDiffIFFT = Math.Max(MathF.Abs(iffRe[i] - x[i]), maxDiffIFFT);
+                }
+                Console.WriteLine($"Card2a roundtrip MaxDiff: {maxDiffIFFT}");
+
+                //Card 2b: convolution theorem — zero-pad h/x to 1024, H·X pointwise, IFFT, ÷N
+                float[] h = HrtfDatabase.GetIr(0, 45, "L");
+                float[] h0 = new float[1024];
+                for (int i = 0; i < h.Length; i++)
+                {
+                    h0[i] = h[i];
+                }
+                float[] x0 = new float[1024];
+                x0[0] = 1f;
+                x0[1] = 0.5f;
+                (float[] hRe, float[] hIm) = Spatializer.FFTProcess(h0, new float[h0.Length]);
+                (float[] xRe, float[] xIm) = Spatializer.FFTProcess(x0, new float[x0.Length]);
+                float[] yR = new float[h0.Length];
+                float[] yI = new float[h0.Length];
+                for (int i = 0; i < yR.Length; i++)
+                {
+                    yR[i] = hRe[i] * xRe[i] - hIm[i] * xIm[i];
+                    yI[i] = hRe[i] * xIm[i] + hIm[i] * xRe[i];
+                }
+                (float[] yT, float[] yTI) = Spatializer.IFFTProcess(yR, yI);
+                for (int i = 0; i < yT.Length; i++)
+                {
+                    yT[i] /= yT.Length;
+                    yTI[i] /= yTI.Length;
+                }
+                Console.WriteLine($"Card2b y[0..2]: " + string.Join(", ", yT.Take(3).Select(f => f.ToString("E1"))));
+                Console.WriteLine($"Card2b expect: -6.1E-005, -9.2E-005, -9.2E-005");
+
+                //Card 3:
+                float[] stream = new float[1440];
+                for(int i = 0; i < stream.Length;i++)
+                {
+                    stream[i] = 0.5f * MathF.Sin(2f * MathF.PI * 7 * i / 480f);
+                }
+                float[] y = Spatializer.OverlapAdd(h, stream, 480);
+                Console.WriteLine($"y[0]: {y[0]}, y[479]: {y[479]}, y[480]: {y[480]}, " +
+                    $"y[481]: {y[481]}, y[529]: {y[529]}, y[1024]: {y[1024]}, y[1440]: {y[1440]}, y[1500]: {y[1500]}, y[1950]: {y[1950]}");
+
+                float[] yRef = new float[stream.Length + h.Length - 1];
+                for (int n = 0; n < yRef.Length; n++)
+                {
+                    for (int k = 0; k < h.Length; k++)
+                    {
+                        if (n - k >= 0 && n - k < stream.Length) yRef[n] += h[k] * stream[n - k];
+                    }
+                }
+                float maxDiff2 = 0;
+                for(int i = 0; i < y.Length; i++)
+                {
+                    maxDiff2 = Math.Max(maxDiff2, MathF.Abs(y[i] - yRef[i]));
+                }
+                Console.WriteLine($"Card3 max|OLA - direct|: {maxDiff2}");
             }
+
         }
         // Audio generation test, kept for future reference.
         static byte[] MakeClickTrain() {
