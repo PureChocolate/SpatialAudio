@@ -94,9 +94,7 @@ namespace SpatialAudio{
                 Console.WriteLine("Test B2 y[0..2]: " + string.Join(", ", b2.Take(3).Select(f => f.ToString("E1"))));
 
                 Console.WriteLine($"Sum H: {sumH}, Sum HR: {sumHR}");
-
-
-
+            
                 // Piece 1 regression — the loader must not have moved
                 float[] data = HrtfDatabase.GetIr(40, 289, "L");
                 Console.WriteLine($"Max value for L40e289a: {data.MaxBy(a => Math.Abs(a))}");

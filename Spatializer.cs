@@ -18,6 +18,22 @@ namespace SpatialAudio
         private static float[] _scratch = new float[960];
         private static byte[] _processed = new byte[_scratch.Length * 4];
 
+        //Buffer for each ear
+        private static float[] _accL = new float[1024];
+        private static float[] _accR = new float[1024];
+        //padded input block
+        private static float[] _block = new float[1024];
+        //FFT per ear
+        private static float[] _ffReL = new float[1024];
+        private static float[] _ffImL = new float[1024];
+        private static float[] _ffReR = new float[1024];
+        private static float[] _ffImR = new float[1024];
+        //HRTF data fft processed per ear
+        private static float[] _HReL = new float[1024];
+        private static float[] _HImL = new float[1024];
+        private static float[] _HReR = new float[1024];
+        private static float[] _HImR = new float[1024];
+
         public static byte[] Process(float[] samples, int sampleRate, float azimuthDeg)
         {
             if(samples.Length != _scratch.Length)
@@ -25,7 +41,8 @@ namespace SpatialAudio
                 _scratch = new float[samples.Length];
                 _processed = new byte[_scratch.Length * 4];
             }
-            HRTFProcess(samples, _scratch);
+            //HRTFProcess(samples, _scratch);
+            OLAProcess(samples, _scratch);
             Buffer.BlockCopy(_scratch, 0, _processed,0,_scratch.Length*4);
             return _processed;
         }
@@ -69,7 +86,7 @@ namespace SpatialAudio
 
         public static void LoadHRTF(int ele, int az)
         {
-            _hL = HrtfDatabase.GetIr(ele,az,"L");
+            _hL = HrtfDatabase.GetIr(ele, az, "L");
             _hR = HrtfDatabase.GetIr(ele, az, "R");
 
             float sL = _hL.Sum(x => MathF.Abs(x));
@@ -77,6 +94,16 @@ namespace SpatialAudio
 
             _hL = sL == 0 ? _hL : _hL.Select(x => x / sL).ToArray();
             _hR = sR == 0 ? _hR : _hR.Select(x => x / sR).ToArray();
+
+            float[] hPL = new float[1024];
+            float[] hPR = new float[1024];
+            for (int i = 0; i < _hL.Length; i++)
+            {
+                hPL[i] = _hL[i];
+                hPR[i] = _hR[i];
+            }
+            (_HReL, _HImL) = FFTProcess(hPL, new float[hPL.Length]);
+            (_HReR, _HImR) = FFTProcess(hPR, new float[hPR.Length]);
         }
 
         public static (float,float) Probes(float[] x, int k)
@@ -216,6 +243,51 @@ namespace SpatialAudio
             }
 
             return output;
+        }
+
+        public static void OLAProcess(float[] x, float[] dest)
+        {
+            Array.Clear(dest,0, dest.Length);
+
+            //L ear
+            Array.Clear(_block,0, _block.Length);
+            for (int f = 0; f < 480; f++) _block[f] = x[2 * f];
+            (float[] reL, float[] imL) = FFTProcess(_block, new float[_block.Length]);
+            for(int k = 0; k < _ffReL.Length; k++)
+            {
+                _ffReL[k] = _HReL[k] * reL[k] - _HImL[k] * imL[k];
+                _ffImL[k] = _HReL[k] * imL[k] + _HImL[k] * reL[k];
+            }
+            (float[] yTL, float[] yTIL) = IFFTProcess(_ffReL, _ffImL);
+            for (int i = 0; i < yTL.Length; i++)
+            {
+                yTL[i] /= yTL.Length;
+                yTIL[i] /= yTIL.Length;
+            }
+            for (int i = 0; i < _accL.Length; i++) _accL[i] += yTL[i];
+            for (int f = 0; f < 480; f++) dest[f * 2] = _accL[f] * 2;
+            for (int k = 0; k < 544; k++) _accL[k] = _accL[k + 480];
+            Array.Clear(_accL, 544, _accL.Length - 544);
+
+            //R ear
+            Array.Clear(_block, 0, _block.Length);
+            for (int f = 0; f < 480; f++) _block[f] = x[(2 * f) + 1];
+            (float[] reR, float[] imR) = FFTProcess(_block, new float[_block.Length]);
+            for (int k = 0; k < _ffReR.Length; k++)
+            {
+                _ffReR[k] = _HReR[k] * reR[k] - _HImR[k] * imR[k];
+                _ffImR[k] = _HReR[k] * imR[k] + _HImR[k] * reR[k];
+            }
+            (float[] yTR, float[] yTIR) = IFFTProcess(_ffReR, _ffImR);
+            for (int i = 0; i < yTR.Length; i++)
+            {
+                yTR[i] /= yTR.Length;
+                yTIR[i] /= yTIR.Length;
+            }
+            for (int i = 0; i < _accR.Length; i++) _accR[i] += yTR[i];
+            for (int f = 0; f < 480; f++) dest[(f * 2) + 1] = _accR[f] * 2;
+            for (int k = 0; k < 544; k++) _accR[k] = _accR[k + 480];
+            Array.Clear(_accR, 544, _accR.Length - 544);
         }
     }
 }
