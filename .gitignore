@@ -5,11 +5,9 @@ obj/
 *.suo
 .vscode/
 
-# Private learning notes — never tracked or pushed
-LEARNING.md
-onlineQs.md
-linkedin_post.md
-AGENTS.md
+# Private docs — single generic entry; never name individual files here
+private/
+opencode.json
 
 # HRTF dataset (~1.4 MB of .dat files) — fetched, not authored
 data/
