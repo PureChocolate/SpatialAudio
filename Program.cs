@@ -34,14 +34,12 @@ namespace SpatialAudio{
             EnableAnsiColors();
             WindowTracker.ListMonitors();
 
-            HrtfDatabase.ReadData();
             Console.WriteLine("Choose run: 1. Standard audio spatializer, 2. HRTF Testing, 3.FFT Testing");
             Spatializer.LoadHRTF(0, 270);
 
             int.TryParse(Console.ReadLine(), out int c);
             if (c == 1)
             {
-
                 RunCapture();
             }
             else if (c == 2)
@@ -271,7 +269,7 @@ namespace SpatialAudio{
                     capture.DataAvailable += OnDataAvailable;
                     void OnDataAvailable(object? sender, WaveInEventArgs e)
                     {
-                        //480 frames of data, interlved so stereo channel = 960 floats/3840 Bytes
+                        //Packet size is the device's, not ours (observed ~2880-3360 frames); resize to whatever arrives.
                         if (e.BytesRecorded != chunk.Length * 4) chunk = new float[e.BytesRecorded / 4];
                         Buffer.BlockCopy(e.Buffer, 0, chunk, 0, e.BytesRecorded);
                         bufferedWave.AddSamples(Spatializer.Process(chunk, capture.WaveFormat.SampleRate, Spatializer.CurrentAzimuthDeg), 0, e.BytesRecorded);

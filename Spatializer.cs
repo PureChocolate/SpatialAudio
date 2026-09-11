@@ -7,8 +7,6 @@ namespace SpatialAudio
     internal static class Spatializer
     {
         public static float CurrentAzimuthDeg { get; set; }
-        private static float[] _ring = new float[32]; //basic ITD buffer 0.6ms so at 48khz ~17cm head thats roughly ~30 samples, 32 for safety.
-        private static int _ringPos = 0;
         //512 - frame length rings, 1 slot per frame per ear
         private static float[] _hrtfRingL = new float[512];
         private static float[] _hrtfRingR = new float[512];
@@ -257,38 +255,43 @@ namespace SpatialAudio
         public static void OLAProcess(float[] x, float[] dest)
         {
             Array.Clear(dest,0, dest.Length);
-
-            //L ear
-            Array.Clear(_block,0, _block.Length);
-            Array.Clear(_blockIm, 0, _blockIm.Length);
-            for (int f = 0; f < 480; f++) _block[f] = x[2 * f];
-            FFTProcessIter(_block, _blockIm);
-            for(int k = 0; k < _ffReL.Length; k++)
+            int frames = x.Length / 2;
+            if (frames % 480 != 0) throw new InvalidDataException("Data stream was not divisible by 480 chunks");
+            int blockSize = 480;
+            for (int blockOffset = 0; blockOffset < frames; blockOffset += blockSize)
             {
-                _ffReL[k] = _HReL[k] * _block[k] - _HImL[k] * _blockIm[k];
-                _ffImL[k] = _HReL[k] * _blockIm[k] + _HImL[k] * _block[k];
-            }
-            IFFTProcessIter(_ffReL, _ffImL);
-            for (int i = 0; i < _accL.Length; i++) _accL[i] += _ffReL[i];
-            for (int f = 0; f < 480; f++) dest[f * 2] = _accL[f] * 2;
-            for (int k = 0; k < 544; k++) _accL[k] = _accL[k + 480];
-            Array.Clear(_accL, 544, _accL.Length - 544);
+                //L ear
+                Array.Clear(_block, 0, _block.Length);
+                Array.Clear(_blockIm, 0, _blockIm.Length);
+                for (int f = 0; f < 480; f++) _block[f] = x[2*(blockOffset + f)];
+                FFTProcessIter(_block, _blockIm);
+                for (int k = 0; k < _ffReL.Length; k++)
+                {
+                    _ffReL[k] = _HReL[k] * _block[k] - _HImL[k] * _blockIm[k];
+                    _ffImL[k] = _HReL[k] * _blockIm[k] + _HImL[k] * _block[k];
+                }
+                IFFTProcessIter(_ffReL, _ffImL);
+                for (int i = 0; i < _accL.Length; i++) _accL[i] += _ffReL[i];
+                for (int f = 0; f < 480; f++) dest[2 * (blockOffset + f)] = _accL[f] * 2;
+                for (int k = 0; k < 544; k++) _accL[k] = _accL[k + 480];
+                Array.Clear(_accL, 544, _accL.Length - 544);
 
-            //R ear
-            Array.Clear(_block, 0, _block.Length);
-            Array.Clear(_blockIm, 0, _blockIm.Length);
-            for (int f = 0; f < 480; f++) _block[f] = x[(2 * f) + 1];
-            FFTProcessIter(_block, _blockIm);
-            for (int k = 0; k < _ffReR.Length; k++)
-            {
-                _ffReR[k] = _HReR[k] * _block[k] - _HImR[k] * _blockIm[k];
-                _ffImR[k] = _HReR[k] * _blockIm[k] + _HImR[k] * _block[k];
+                //R ear
+                Array.Clear(_block, 0, _block.Length);
+                Array.Clear(_blockIm, 0, _blockIm.Length);
+                for (int f = 0; f < 480; f++) _block[f] = x[2 * (blockOffset + f) + 1];
+                FFTProcessIter(_block, _blockIm);
+                for (int k = 0; k < _ffReR.Length; k++)
+                {
+                    _ffReR[k] = _HReR[k] * _block[k] - _HImR[k] * _blockIm[k];
+                    _ffImR[k] = _HReR[k] * _blockIm[k] + _HImR[k] * _block[k];
+                }
+                IFFTProcessIter(_ffReR, _ffImR);
+                for (int i = 0; i < _accR.Length; i++) _accR[i] += _ffReR[i];
+                for (int f = 0; f < 480; f++) dest[2 * (blockOffset + f) + 1] = _accR[f] * 2;
+                for (int k = 0; k < 544; k++) _accR[k] = _accR[k + 480];
+                Array.Clear(_accR, 544, _accR.Length - 544);
             }
-            IFFTProcessIter(_ffReR, _ffImR);
-            for (int i = 0; i < _accR.Length; i++) _accR[i] += _ffReR[i];
-            for (int f = 0; f < 480; f++) dest[(f * 2) + 1] = _accR[f] * 2;
-            for (int k = 0; k < 544; k++) _accR[k] = _accR[k + 480];
-            Array.Clear(_accR, 544, _accR.Length - 544);
         }
 
         public static void FFTProcessIter(float[] re, float[] im)
@@ -413,6 +416,16 @@ namespace SpatialAudio
                     im[i] /= re.Length;
                 }
             }
+        }
+
+        public static void Reset()
+        {
+            Array.Clear(_accL, 0, _accL.Length);
+            Array.Clear(_accR, 0, _accR.Length);
+            Array.Clear(_hrtfRingL, 0, _hrtfRingL.Length);
+            Array.Clear(_hrtfRingR, 0, _hrtfRingR.Length);
+            _hrtfPosL = 0;
+            _hrtfPosR = 0;
         }
 
        static Spatializer()

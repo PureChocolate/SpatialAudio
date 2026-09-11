@@ -26,13 +26,32 @@ namespace SpatialAudio
                 return HashCode.Combine(Side, Elev, Az);
             }
         }
-        private static readonly string _folderPath = @"F:\Code\SpatialAudio\data\full\full";
         private static Dictionary<HRTFLocator, float[]> _dataFiles = [];
+        internal static string? path = null;
+
+        static HrtfDatabase()
+        {
+            string? dir = AppContext.BaseDirectory;
+            while (dir != null)
+            {
+                string candidate = Path.Combine(dir, "data", "full", "full");
+                if (Directory.Exists(candidate))
+                {
+                    path = candidate;
+                    break;
+                }
+                dir = Directory.GetParent(dir)?.FullName;
+            }
+            ReadData();
+        }
+
+        public static bool IsAvailable() { return path != null && Directory.Exists(path); }
         public static void ReadData()
         {
-            if (Directory.Exists(_folderPath))
+            _dataFiles.Clear();
+            if (Directory.Exists(path))
             {
-                var allDirectories = Directory.EnumerateDirectories(_folderPath, "elev*", SearchOption.AllDirectories);
+                var allDirectories = Directory.EnumerateDirectories(path, "elev*", SearchOption.AllDirectories);
 
                 foreach (string directory in allDirectories)
                 {
@@ -44,18 +63,18 @@ namespace SpatialAudio
                         byte[] data = File.ReadAllBytes(file);
                         float[] vals = new float[512];
                         int v = 0;
-                        for (int i = 0; i < data.Length-1; i += 2)
+                        for (int i = 0; i < data.Length - 1; i += 2)
                         {
                             byte a = data[i];
-                            byte b = data[i+1];
+                            byte b = data[i + 1];
 
                             vals[v++] = ((short)(a << 8 | b)) / 32768f;
                         }
                         _dataFiles.Add(hrtfFile, vals);
                     }
-                    Console.WriteLine($"{Path.GetFileNameWithoutExtension(directory)}: {elevations}");
+                    //Console.WriteLine($"{Path.GetFileNameWithoutExtension(directory)}: {elevations}");
                 }
-                Console.WriteLine();                
+                //Console.WriteLine();
             }
         }
 
