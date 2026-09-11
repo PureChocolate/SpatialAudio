@@ -1,5 +1,6 @@
 # SpatialAudio
 
+[![CI](https://github.com/PureChocolate/SpatialAudio/actions/workflows/ci.yaml/badge.svg)](https://github.com/PureChocolate/SpatialAudio/actions/workflows/ci.yaml)
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4)
 ![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D4)
 ![C#](https://img.shields.io/badge/language-C%23-239120)
