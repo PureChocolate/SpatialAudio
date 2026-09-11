@@ -9,6 +9,12 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
+	<Compile Remove="SpatialAudio.Tests/**" />
+	<None Remove="SpatialAudio.Tests/**" />
+
+	  <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+		  <_Parameter1>SpatialAudio.Tests</_Parameter1>
+	  </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="SpatialAudio.csproj" />
+  <Project Path="SpatialAudio.Tests/SpatialAudio.Tests.csproj" Id="7409811f-cfcb-466f-9ce8-0c2d1bea5383" />
 </Solution>
