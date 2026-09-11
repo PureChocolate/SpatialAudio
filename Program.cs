@@ -141,8 +141,6 @@ namespace SpatialAudio{
                 float maxDiffIFFT = 0;
                 for (int i = 0; i < iffRe.Length; i++)
                 {
-                    iffRe[i] /= iffRe.Length;
-                    iffIm[i] /= iffIm.Length;
                     maxDiffIFFT = Math.Max(MathF.Abs(iffRe[i] - x[i]), maxDiffIFFT);
                 }
                 Console.WriteLine($"Card2a roundtrip MaxDiff: {maxDiffIFFT}");
@@ -167,11 +165,6 @@ namespace SpatialAudio{
                     yI[i] = hRe[i] * xIm[i] + hIm[i] * xRe[i];
                 }
                 (float[] yT, float[] yTI) = Spatializer.IFFTProcess(yR, yI);
-                for (int i = 0; i < yT.Length; i++)
-                {
-                    yT[i] /= yT.Length;
-                    yTI[i] /= yTI.Length;
-                }
                 Console.WriteLine($"Card2b y[0..2]: " + string.Join(", ", yT.Take(3).Select(f => f.ToString("E1"))));
                 Console.WriteLine($"Card2b expect: -6.1E-005, -9.2E-005, -9.2E-005");
 
@@ -199,6 +192,32 @@ namespace SpatialAudio{
                     maxDiff2 = Math.Max(maxDiff2, MathF.Abs(y[i] - yRef[i]));
                 }
                 Console.WriteLine($"Card3 max|OLA - direct|: {maxDiff2}");
+
+                //Card 4: OLA Path vs direct-form path
+                Spatializer.LoadHRTF(0, 45);
+
+                float[] stereo = new float[2880];
+                for(int f = 0; f < 1440; f++)
+                {
+                    stereo[2 * f] = 0.5f * MathF.Sin(2f * MathF.PI * 7 * f / 480f);
+                    stereo[2 * f + 1] = stereo[2 * f];
+                }
+
+                float[] destDirect = new float[960];
+                float[] destOla = new float[960];
+                float maxErr = 0;
+                for (int b = 0; b < stereo.Length; b+=960)
+                {
+                    float[] chunk = new float[960];
+                    Array.Copy(stereo, b, chunk, 0, 960);
+                    Spatializer.HRTFProcess(chunk, destDirect);
+                    Spatializer.OLAProcess(chunk, destOla);
+                    for(int i = 0; i < 960; i++)
+                    {
+                        maxErr = Math.Max(maxErr, MathF.Abs(destDirect[i] - destOla[i]));
+                    }
+                }
+                Console.WriteLine($"Max Error OLA vs Direct: {maxErr}");
             }
 
         }

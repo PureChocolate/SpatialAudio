@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace SpatialAudio
@@ -23,6 +24,7 @@ namespace SpatialAudio
         private static float[] _accR = new float[1024];
         //padded input block
         private static float[] _block = new float[1024];
+        private static float[] _blockIm = new float[1024];
         //FFT per ear
         private static float[] _ffReL = new float[1024];
         private static float[] _ffImL = new float[1024];
@@ -33,6 +35,8 @@ namespace SpatialAudio
         private static float[] _HImL = new float[1024];
         private static float[] _HReR = new float[1024];
         private static float[] _HImR = new float[1024];
+        private static readonly float[] _twRe = new float[512];
+        private static readonly float[] _twIm = new float[512];
 
         public static byte[] Process(float[] samples, int sampleRate, float azimuthDeg)
         {
@@ -169,6 +173,17 @@ namespace SpatialAudio
 
         public static (float[], float[]) IFFTProcess(float[] re, float[] im)
         {
+            (float[] outRe, float[] outIm) = IFFTProcessRecursive(re, im);
+            for (int i = 0; i < outRe.Length; i++)
+            {
+                outRe[i] /= outRe.Length;
+                outIm[i] /= outIm.Length;
+            }
+            return (outRe, outIm);
+        }
+
+        public static (float[], float[]) IFFTProcessRecursive(float[] re, float[] im)
+        {
             if (re.Length == 1) return (re, im);
             float[] eRe = new float[re.Length / 2];
             float[] eIm = new float[im.Length / 2];
@@ -183,8 +198,8 @@ namespace SpatialAudio
             }
 
             //process out arrays to generate real, imaginary arrays on even and odd
-            (float[] eR, float[] Ei) = IFFTProcess(eRe, eIm);
-            (float[] oR, float[] oI) = IFFTProcess(oRe, oIm);
+            (float[] eR, float[] Ei) = IFFTProcessRecursive(eRe, eIm);
+            (float[] oR, float[] oI) = IFFTProcessRecursive(oRe, oIm);
 
             float[] outRe = new float[re.Length];
             float[] outIm = new float[re.Length];
@@ -212,30 +227,24 @@ namespace SpatialAudio
         public static float[] OverlapAdd(float[] h, float[] x, int blockSize)
         {
             float[] output = new float[x.Length + h.Length - 1];
-            float[] h0 = new float[1024];
-            for (int i = 0; i < h.Length; i++)
-            {
-                h0[i] = h[i];
-            }
-            (float[] hRe, float[] hIm) = FFTProcess(h0, new float[h0.Length]);
+            float[] hRe = new float[1024];
+            float[] hIm = new float[1024];
+            for (int i = 0; i < h.Length; i++) hRe[i] = h[i];
+            FFTProcessIter(hRe, hIm);
             for (int b = 0; b < x.Length; b += blockSize)
             {
-                float[] bX = new float[1024];
-                Array.Copy(x, b, bX, 0, blockSize);
-                (float[] xRe, float[] xIm) = FFTProcess(bX, new float[bX.Length]);
-                float[] yR = new float[h0.Length];
-                float[] yI = new float[h0.Length];
+                float[] xRe = new float[1024];
+                float[] xIm = new float[1024];
+                Array.Copy(x, b, xRe, 0, blockSize);
+                FFTProcessIter(xRe, xIm);
+                float[] yR = new float[hRe.Length];
+                float[] yI = new float[hRe.Length];
                 for (int i = 0; i < yR.Length; i++)
                 {
                     yR[i] = hRe[i] * xRe[i] - hIm[i] * xIm[i];
                     yI[i] = hRe[i] * xIm[i] + hIm[i] * xRe[i];
                 }
-                (float[] yT, float[] yTI) = Spatializer.IFFTProcess(yR, yI);
-                for (int i = 0; i < yT.Length; i++)
-                {
-                    yT[i] /= yT.Length;
-                    yTI[i] /= yTI.Length;
-                }
+                (float[] yT, float[] yTI) = IFFTProcess(yR, yI);
                 for(int i = 0; i < 1024; i++)
                 {
                     if(b+i < output.Length) output[b + i] += yT[i];
@@ -251,43 +260,169 @@ namespace SpatialAudio
 
             //L ear
             Array.Clear(_block,0, _block.Length);
+            Array.Clear(_blockIm, 0, _blockIm.Length);
             for (int f = 0; f < 480; f++) _block[f] = x[2 * f];
-            (float[] reL, float[] imL) = FFTProcess(_block, new float[_block.Length]);
+            FFTProcessIter(_block, _blockIm);
             for(int k = 0; k < _ffReL.Length; k++)
             {
-                _ffReL[k] = _HReL[k] * reL[k] - _HImL[k] * imL[k];
-                _ffImL[k] = _HReL[k] * imL[k] + _HImL[k] * reL[k];
+                _ffReL[k] = _HReL[k] * _block[k] - _HImL[k] * _blockIm[k];
+                _ffImL[k] = _HReL[k] * _blockIm[k] + _HImL[k] * _block[k];
             }
-            (float[] yTL, float[] yTIL) = IFFTProcess(_ffReL, _ffImL);
-            for (int i = 0; i < yTL.Length; i++)
-            {
-                yTL[i] /= yTL.Length;
-                yTIL[i] /= yTIL.Length;
-            }
-            for (int i = 0; i < _accL.Length; i++) _accL[i] += yTL[i];
+            IFFTProcessIter(_ffReL, _ffImL);
+            for (int i = 0; i < _accL.Length; i++) _accL[i] += _ffReL[i];
             for (int f = 0; f < 480; f++) dest[f * 2] = _accL[f] * 2;
             for (int k = 0; k < 544; k++) _accL[k] = _accL[k + 480];
             Array.Clear(_accL, 544, _accL.Length - 544);
 
             //R ear
             Array.Clear(_block, 0, _block.Length);
+            Array.Clear(_blockIm, 0, _blockIm.Length);
             for (int f = 0; f < 480; f++) _block[f] = x[(2 * f) + 1];
-            (float[] reR, float[] imR) = FFTProcess(_block, new float[_block.Length]);
+            FFTProcessIter(_block, _blockIm);
             for (int k = 0; k < _ffReR.Length; k++)
             {
-                _ffReR[k] = _HReR[k] * reR[k] - _HImR[k] * imR[k];
-                _ffImR[k] = _HReR[k] * imR[k] + _HImR[k] * reR[k];
+                _ffReR[k] = _HReR[k] * _block[k] - _HImR[k] * _blockIm[k];
+                _ffImR[k] = _HReR[k] * _blockIm[k] + _HImR[k] * _block[k];
             }
-            (float[] yTR, float[] yTIR) = IFFTProcess(_ffReR, _ffImR);
-            for (int i = 0; i < yTR.Length; i++)
-            {
-                yTR[i] /= yTR.Length;
-                yTIR[i] /= yTIR.Length;
-            }
-            for (int i = 0; i < _accR.Length; i++) _accR[i] += yTR[i];
+            IFFTProcessIter(_ffReR, _ffImR);
+            for (int i = 0; i < _accR.Length; i++) _accR[i] += _ffReR[i];
             for (int f = 0; f < 480; f++) dest[(f * 2) + 1] = _accR[f] * 2;
             for (int k = 0; k < 544; k++) _accR[k] = _accR[k + 480];
             Array.Clear(_accR, 544, _accR.Length - 544);
+        }
+
+        public static void FFTProcessIter(float[] re, float[] im)
+        {
+            if (re.Length > 1)
+            {
+                int lvl = BitOperations.Log2((uint)re.Length);
+                //Bit flip/shift the index/swap values to prep the array
+                for (int i = 0; i < re.Length; i++)
+                {
+                    int reversed = 0;
+                    int input = i;
+                    for (int b = 0; b < lvl; b++)
+                    {
+                        reversed = (reversed << 1) | (input & 1);
+                        input >>=  1;
+                    }
+
+                    if(reversed > i)
+                    {
+                        (re[i], re[reversed]) = (re[reversed], re[i]);
+                        (im[i], im[reversed]) = (im[reversed], im[i]);
+                    }
+                }
+                
+                // Start in pairs of 2 and then go up * 2
+                int group = 2;
+                while (group <= re.Length)
+                {
+                    int step = group / 2; // Step count is half the group length(group of 8 steps 4 ahead, 0,1,2,3 and 4,5,6,7 so 0-4,1-5,2-6,3-7)
+                    for (int block = 0; block < re.Length; block += group)
+                    {
+                        for(int k = 0; k < step; k++)
+                        {
+                            int tick = k * (1024 / group);
+                            float wR = _twRe[tick];
+                            float wI = _twIm[tick];
+
+                            int iEven = block + k;
+                            int iOdd = block + k + step;
+
+                            float evenR = re[iEven];// store old values
+                            float evenI = im[iEven];
+
+                            // rotate points
+                            float tR = wR * re[iOdd] - wI * im[iOdd];
+                            float tI = wR * im[iOdd] + wI * re[iOdd];
+
+                            // apply rotations
+                            re[iOdd] = evenR - tR;
+                            im[iOdd] = evenI - tI;
+
+                            re[iEven] = evenR + tR;
+                            im[iEven] = evenI + tI;
+                        }
+                    }
+                    group *= 2;
+                }
+            }
+        }
+
+        public static void IFFTProcessIter(float[] re, float[] im)
+        {
+            if (re.Length > 1)
+            {
+                //Bit flip/shift the index/swap values to prep the array
+                int lvl = BitOperations.Log2((uint)re.Length);
+                for (int i = 0; i < re.Length; i++)
+                {
+                    int reversed = 0;
+                    int input = i;
+                    for (int b = 0; b < lvl; b++)
+                    {
+                        reversed = (reversed << 1) | (input & 1);
+                        input >>= 1;
+                    }
+
+                    if (reversed > i)
+                    {
+                        (re[i], re[reversed]) = (re[reversed], re[i]);
+                        (im[i], im[reversed]) = (im[reversed], im[i]);
+                    }
+                }
+
+                // Start in pairs of 2 and then go up * 2
+                int group = 2;
+                while (group <= re.Length)
+                {
+                    int step = group / 2; // Step count is half the group length(group of 8 steps 4 ahead, 0,1,2,3 and 4,5,6,7 so 0-4,1-5,2-6,3-7)
+                    for (int block = 0; block < re.Length; block += group)
+                    {
+                        for (int k = 0; k < step; k++)
+                        {
+                            int tick = k * (1024 / group);
+                            float wR = _twRe[tick];
+                            float wI = -_twIm[tick];
+
+                            int iEven = block + k;
+                            int iOdd = block + k + step;
+
+                            float evenR = re[iEven];
+                            float evenI = im[iEven];
+
+                            // rotate points
+                            float tR = wR * re[iOdd] - wI * im[iOdd];
+                            float tI = wR * im[iOdd] + wI * re[iOdd];
+
+                            // apply rotations
+                            re[iOdd] = evenR - tR;
+                            im[iOdd] = evenI - tI;
+
+                            re[iEven] = evenR + tR;
+                            im[iEven] = evenI + tI;
+                        }
+                    }
+                    group *= 2;
+                }
+                // apply /N normalization during processing, take over from caller handling it
+                for (int i = 0; i < re.Length; i++)
+                {
+                    re[i] /= re.Length;
+                    im[i] /= re.Length;
+                }
+            }
+        }
+
+       static Spatializer()
+        {
+            for(int i = 0; i < 512; i++)
+            {
+                float angle = -2f * MathF.PI * i / 1024;
+                _twRe[i] = MathF.Cos(angle);
+                _twIm[i] = MathF.Sin(angle);
+            }
         }
     }
 }

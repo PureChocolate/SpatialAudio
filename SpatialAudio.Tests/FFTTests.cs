@@ -56,15 +56,98 @@
 
             (float[] re, float[] im) = Spatializer.FFTProcess(a, new float[a.Length]);
             (float[] re2, float[] im2) = Spatializer.IFFTProcess(re, im);
-            for (int i = 0; i < re2.Length; i++)
-            {
-                re2[i] /= re2.Length;
-                im2[i] /= im2.Length;
-            }
             for(int i = 0; i < re2.Length; i++)
             {
                 Assert.True(Math.Abs(re2[i] - a[i]) < tol, $"Expected < {tol} or ~0, Actual: {re2[i] - a[i]}");
                 Assert.True(Math.Abs(im2[i]) < tol, $"Expected < {tol} or ~0, Actual: {im2[i]}");
+            }
+        }
+
+        [Fact]
+        public void FFTIterVsRecur()
+        {
+            float tol8 = 1e-5f;
+            float tol512 = 5e-5f; // measured |FFT - Probes| for error rate on fixed inputs below, Re 3.05e-5, Im 1.62e-5 (N=512)
+            float[][] a =
+            {
+                    new float[8], new float[8], new float[8], new float[512]
+            };
+            a[0][0] = 1f;
+            for (int v = 0; v < a[1].Length; v++)
+            {
+                a[1][v] = MathF.Cos(2 * MathF.PI * 1 * v / a[1].Length);
+                a[2][v] = MathF.Sin(2 * MathF.PI * 1 * v / a[1].Length);
+            }
+            Random seed = new Random(42);
+            for (int i = 0; i < a[3].Length; i++)
+            {
+                a[3][i] = ((seed.NextSingle() * 2.0f) - 1.0f);
+            }
+            foreach (float[] t in a)
+            {
+                Assert.True(t.Length % 2 == 0, $"Data size not of 2^n");
+
+                float[] im = new float[t.Length];
+                (float[] ffR, float[] ffI) = Spatializer.FFTProcess(t, im);
+                Spatializer.FFTProcessIter(t, im);
+
+                for (int k = 0; k < t.Length; k++)
+                {
+                    float diff = MathF.Abs(t[k] - ffR[k]);
+                    float diff2 = MathF.Abs(im[k] - ffI[k]);
+
+                    if (t.Length == 8)
+                    {
+                        Assert.True(diff < tol8, $"Real Expected diff: {tol8}, Actual: {diff}, at k: {k}");
+                        Assert.True(diff2 < tol8, $"Imaginary Expected diff: {tol8}, Actual: {diff2}, at k: {k}");
+                    }
+                    else if (t.Length == 512)
+                    {
+                        Assert.True(diff < tol512, $"Real Expected diff: {tol512}, Actual: {diff}, at k: {k}");
+                        Assert.True(diff2 < tol512, $"Imaginary Expected diff: {tol512}, Actual: {diff2}, at k: {k}");
+                    }
+                }
+            }
+        }
+        [Fact]
+        public void IFFTIterReversal()
+        {
+            float tol = 5e-5f;
+            Random seed = new Random(42);
+            float[] re = new float[512];
+            for (int i = 0; i < re.Length; i++) re[i] = ((seed.NextSingle() * 2.0f) - 1.0f);
+            float[] original = (float[])re.Clone();
+            float[] im = new float[re.Length];
+
+            Spatializer.FFTProcessIter(re, im);
+            Spatializer.IFFTProcessIter(re, im);
+
+            for (int i = 0; i < re.Length; i++)
+            {
+                Assert.True(MathF.Abs(re[i] - original[i]) < tol, $"Expected < {tol} or ~0, Actual: {re[i] - original[i]}");
+                Assert.True(MathF.Abs(im[i]) < tol, $"Expected < {tol} or ~0, Actual: {im[i]}");
+            }
+        }
+
+        [Fact]
+        public void IFFTIterVsRecur()
+        {
+            float tol = 5e-5f;
+            Random seed = new Random(42);
+            float[] a = new float[512];
+            for (int i = 0; i < a.Length; i++) a[i] = ((seed.NextSingle() * 2.0f) - 1.0f);
+
+            (float[] specRe, float[] specIm) = Spatializer.FFTProcess(a, new float[a.Length]);
+
+            float[] iterRe = (float[])specRe.Clone();
+            float[] iterIm = (float[])specIm.Clone();
+            Spatializer.IFFTProcessIter(iterRe, iterIm);
+            (float[] recRe, float[] recIm) = Spatializer.IFFTProcess(specRe, specIm);
+
+            for (int i = 0; i < a.Length; i++)
+            {
+                Assert.True(MathF.Abs(iterRe[i] - recRe[i]) < tol, $"Real Expected < {tol}, Actual: {iterRe[i] - recRe[i]}, at i: {i}");
+                Assert.True(MathF.Abs(iterIm[i] - recIm[i]) < tol, $"Imag Expected < {tol}, Actual: {iterIm[i] - recIm[i]}, at i: {i}");
             }
         }
     }
