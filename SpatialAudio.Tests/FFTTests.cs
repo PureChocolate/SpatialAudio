@@ -150,5 +150,50 @@
                 Assert.True(MathF.Abs(iterIm[i] - recIm[i]) < tol, $"Imag Expected < {tol}, Actual: {iterIm[i] - recIm[i]}, at i: {i}");
             }
         }
+
+        [Fact]
+        public void Resampled()
+        {
+            float tol = 2 * (MathF.Pow((2 * MathF.PI * 1000) / 44100, 2) / 8); //calculate tol and double it for margin (w*dT)^2 / 8 = (2pi * 1000)^2 / 8
+            float[] x = new float[512];
+            for(int i = 0; i < x.Length; i++)
+            {
+                x[i] = MathF.Sin(2 * MathF.PI * 1000 * i / 44100);
+            }
+            float[] xRes = Spatializer.Resample(x, 44100.0,48000.0);
+            for(int i =0; i < xRes.Length; i++)
+            {
+                Assert.True(Math.Abs(MathF.Sin(2 * MathF.PI * 1000 * i / 48000) - xRes[i]) < tol);
+            }
+        }
+
+        [SkippableFact]
+        public void ResampleKEMAR()
+        {
+            Skip.IfNot(HrtfDatabase.IsAvailable());
+            float[] az45 = (float[])Spatializer._tableHReL[9].Clone();
+            float[] imaz45 = (float[])Spatializer._tableHImL[9].Clone();
+
+            Assert.Equal(1024, Spatializer._tableHReL[9].Length);
+            Assert.Equal(1024, Spatializer._tableHImL[9].Length);
+
+            Spatializer.IFFTProcessIter(az45, imaz45);
+            float[] az45R = (float[])Spatializer._tableHReR[9].Clone();
+            float[] imaz45R = (float[])Spatializer._tableHImR[9].Clone();
+            Assert.Equal(1024, Spatializer._tableHReR[9].Length);
+            Assert.Equal(1024, Spatializer._tableHImR[9].Length);
+            Spatializer.IFFTProcessIter(az45R, imaz45R);
+
+            float[] goldenL = {-1.5195722e-05f, -1.5195722e-05f, -1.5195722e-05f, -1.5195722e-05f,
+            -1.5195722e-05f, -1.0684492e-05f, -7.5978612e-06f, -4.3212835e-06f};
+            float[] goldenR = {0f, 1.0144337e-05f, 4.1060412e-06f, -7.677262e-06f,
+             -1.8494438e-05f, -1.8804979e-05f, -9.4887508e-06f, 5.5724845e-06f};
+
+            for(int i = 0; i < goldenL.Length; i++)
+            {
+                Assert.True(Math.Abs(az45[i] - goldenL[i]) < 1e-6);
+                Assert.True(Math.Abs(az45R[i] - goldenR[i]) < 1e-6);
+            }
+        }
     }
 }

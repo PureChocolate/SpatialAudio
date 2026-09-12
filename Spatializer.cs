@@ -6,6 +6,7 @@ namespace SpatialAudio
 {
     internal static class Spatializer
     {
+        #region Fields
         public static float CurrentAzimuthDeg { get; set; }
         //512 - frame length rings, 1 slot per frame per ear
         private static float[] _hrtfRingL = new float[512];
@@ -35,9 +36,51 @@ namespace SpatialAudio
         private static float[] _HImR = new float[1024];
         private static readonly float[] _twRe = new float[512];
         private static readonly float[] _twIm = new float[512];
+        internal static float[][] _tableHReL = new float[72][];
+        internal static float[][] _tableHImL = new float[72][];
+        internal static float[][] _tableHReR = new float[72][];
+        internal static float[][] _tableHImR = new float[72][];
+        private static float _lastAZ = float.NaN;
+        internal static float[] _HtReL = new float[1024];
+        internal static float[] _HtImL = new float[1024];
+        internal static float[] _HtReR = new float[1024];
+        internal static float[] _HtImR = new float[1024];
+        private static bool _filterPrimed = false;
+        private const float MasterGain = 4f;
+        #endregion
+
+        internal static void UpdateFilter(float azimuthDeg)
+        {
+            float keemarAZ = azimuthDeg >= 0 ? azimuthDeg : 360f + azimuthDeg;
+            float pos = keemarAZ / 5f;
+            int low = (int)MathF.Floor(pos) % 72;
+            int high = (low + 1) % 72;
+            float w = pos - MathF.Floor(pos);
+
+            for (int k = 0; k < 1024; k++)
+            {
+                _HtReL[k] = _tableHReL[low][k] * (1 - w) + _tableHReL[high][k] * w;
+                _HtReR[k] = _tableHReR[low][k] * (1 - w) + _tableHReR[high][k] * w;
+                _HtImR[k] = _tableHImR[low][k] * (1 - w) + _tableHImR[high][k] * w;
+                _HtImL[k] = _tableHImL[low][k] * (1 - w) + _tableHImL[high][k] * w;
+            }
+        }
 
         public static byte[] Process(float[] samples, int sampleRate, float azimuthDeg)
         {
+            if(azimuthDeg != _lastAZ)
+            {
+                _lastAZ = azimuthDeg;
+                UpdateFilter(azimuthDeg);
+                if (!_filterPrimed)
+                {
+                    Array.Copy(_HtReL, _HReL, 1024);
+                    Array.Copy(_HtImL, _HImL, 1024);
+                    Array.Copy(_HtReR, _HReR, 1024);
+                    Array.Copy(_HtImR, _HImR, 1024);
+                    _filterPrimed = true;
+                }
+            }
             if(samples.Length != _scratch.Length)
             {
                 _scratch = new float[samples.Length];
@@ -45,6 +88,7 @@ namespace SpatialAudio
             }
             //HRTFProcess(samples, _scratch);
             OLAProcess(samples, _scratch);
+            for (int i = 0; i < _scratch.Length; i++) _scratch[i] *= MasterGain;
             Buffer.BlockCopy(_scratch, 0, _processed,0,_scratch.Length*4);
             return _processed;
         }
@@ -106,6 +150,11 @@ namespace SpatialAudio
             }
             (_HReL, _HImL) = FFTProcess(hPL, new float[hPL.Length]);
             (_HReR, _HImR) = FFTProcess(hPR, new float[hPR.Length]);
+            Array.Copy(_HReL, _HtReL, 1024);
+            Array.Copy(_HImL, _HtImL, 1024);
+            Array.Copy(_HReR, _HtReR, 1024);
+            Array.Copy(_HImR, _HtImR, 1024);
+            _filterPrimed = true;
         }
 
         public static (float,float) Probes(float[] x, int k)
@@ -120,6 +169,7 @@ namespace SpatialAudio
             return (sum,sumS);
         }
 
+        #region FFTs
         // Radix-2 FFT (decimation in time): even/odd parity split per level, recursion
         // to N=1, butterfly X[k] = E + w^k·O, X[k+N/2] = E − w^k·O. N = re.Length.
         // Verified vs the direct DFT (Probes): N=8 tables (impulse/cos1/sin1) and
@@ -221,79 +271,6 @@ namespace SpatialAudio
             }
             return (outRe, outIm);
         }
-
-        public static float[] OverlapAdd(float[] h, float[] x, int blockSize)
-        {
-            float[] output = new float[x.Length + h.Length - 1];
-            float[] hRe = new float[1024];
-            float[] hIm = new float[1024];
-            for (int i = 0; i < h.Length; i++) hRe[i] = h[i];
-            FFTProcessIter(hRe, hIm);
-            for (int b = 0; b < x.Length; b += blockSize)
-            {
-                float[] xRe = new float[1024];
-                float[] xIm = new float[1024];
-                Array.Copy(x, b, xRe, 0, blockSize);
-                FFTProcessIter(xRe, xIm);
-                float[] yR = new float[hRe.Length];
-                float[] yI = new float[hRe.Length];
-                for (int i = 0; i < yR.Length; i++)
-                {
-                    yR[i] = hRe[i] * xRe[i] - hIm[i] * xIm[i];
-                    yI[i] = hRe[i] * xIm[i] + hIm[i] * xRe[i];
-                }
-                (float[] yT, float[] yTI) = IFFTProcess(yR, yI);
-                for(int i = 0; i < 1024; i++)
-                {
-                    if(b+i < output.Length) output[b + i] += yT[i];
-                }
-            }
-
-            return output;
-        }
-
-        public static void OLAProcess(float[] x, float[] dest)
-        {
-            Array.Clear(dest,0, dest.Length);
-            int frames = x.Length / 2;
-            if (frames % 480 != 0) throw new InvalidDataException("Data stream was not divisible by 480 chunks");
-            int blockSize = 480;
-            for (int blockOffset = 0; blockOffset < frames; blockOffset += blockSize)
-            {
-                //L ear
-                Array.Clear(_block, 0, _block.Length);
-                Array.Clear(_blockIm, 0, _blockIm.Length);
-                for (int f = 0; f < 480; f++) _block[f] = x[2*(blockOffset + f)];
-                FFTProcessIter(_block, _blockIm);
-                for (int k = 0; k < _ffReL.Length; k++)
-                {
-                    _ffReL[k] = _HReL[k] * _block[k] - _HImL[k] * _blockIm[k];
-                    _ffImL[k] = _HReL[k] * _blockIm[k] + _HImL[k] * _block[k];
-                }
-                IFFTProcessIter(_ffReL, _ffImL);
-                for (int i = 0; i < _accL.Length; i++) _accL[i] += _ffReL[i];
-                for (int f = 0; f < 480; f++) dest[2 * (blockOffset + f)] = _accL[f] * 2;
-                for (int k = 0; k < 544; k++) _accL[k] = _accL[k + 480];
-                Array.Clear(_accL, 544, _accL.Length - 544);
-
-                //R ear
-                Array.Clear(_block, 0, _block.Length);
-                Array.Clear(_blockIm, 0, _blockIm.Length);
-                for (int f = 0; f < 480; f++) _block[f] = x[2 * (blockOffset + f) + 1];
-                FFTProcessIter(_block, _blockIm);
-                for (int k = 0; k < _ffReR.Length; k++)
-                {
-                    _ffReR[k] = _HReR[k] * _block[k] - _HImR[k] * _blockIm[k];
-                    _ffImR[k] = _HReR[k] * _blockIm[k] + _HImR[k] * _block[k];
-                }
-                IFFTProcessIter(_ffReR, _ffImR);
-                for (int i = 0; i < _accR.Length; i++) _accR[i] += _ffReR[i];
-                for (int f = 0; f < 480; f++) dest[2 * (blockOffset + f) + 1] = _accR[f] * 2;
-                for (int k = 0; k < 544; k++) _accR[k] = _accR[k + 480];
-                Array.Clear(_accR, 544, _accR.Length - 544);
-            }
-        }
-
         public static void FFTProcessIter(float[] re, float[] im)
         {
             if (re.Length > 1)
@@ -307,16 +284,16 @@ namespace SpatialAudio
                     for (int b = 0; b < lvl; b++)
                     {
                         reversed = (reversed << 1) | (input & 1);
-                        input >>=  1;
+                        input >>= 1;
                     }
 
-                    if(reversed > i)
+                    if (reversed > i)
                     {
                         (re[i], re[reversed]) = (re[reversed], re[i]);
                         (im[i], im[reversed]) = (im[reversed], im[i]);
                     }
                 }
-                
+
                 // Start in pairs of 2 and then go up * 2
                 int group = 2;
                 while (group <= re.Length)
@@ -324,7 +301,7 @@ namespace SpatialAudio
                     int step = group / 2; // Step count is half the group length(group of 8 steps 4 ahead, 0,1,2,3 and 4,5,6,7 so 0-4,1-5,2-6,3-7)
                     for (int block = 0; block < re.Length; block += group)
                     {
-                        for(int k = 0; k < step; k++)
+                        for (int k = 0; k < step; k++)
                         {
                             int tick = k * (1024 / group);
                             float wR = _twRe[tick];
@@ -417,6 +394,139 @@ namespace SpatialAudio
                 }
             }
         }
+        #endregion
+        public static float[] OverlapAdd(float[] h, float[] x, int blockSize)
+        {
+            float[] output = new float[x.Length + h.Length - 1];
+            float[] hRe = new float[1024];
+            float[] hIm = new float[1024];
+            for (int i = 0; i < h.Length; i++) hRe[i] = h[i];
+            FFTProcessIter(hRe, hIm);
+            for (int b = 0; b < x.Length; b += blockSize)
+            {
+                float[] xRe = new float[1024];
+                float[] xIm = new float[1024];
+                Array.Copy(x, b, xRe, 0, blockSize);
+                FFTProcessIter(xRe, xIm);
+                float[] yR = new float[hRe.Length];
+                float[] yI = new float[hRe.Length];
+                for (int i = 0; i < yR.Length; i++)
+                {
+                    yR[i] = hRe[i] * xRe[i] - hIm[i] * xIm[i];
+                    yI[i] = hRe[i] * xIm[i] + hIm[i] * xRe[i];
+                }
+                (float[] yT, float[] yTI) = IFFTProcess(yR, yI);
+                for(int i = 0; i < 1024; i++)
+                {
+                    if(b+i < output.Length) output[b + i] += yT[i];
+                }
+            }
+
+            return output;
+        }
+
+        public static void OLAProcess(float[] x, float[] dest)
+        {
+            Array.Clear(dest,0, dest.Length);
+            int frames = x.Length / 2;
+            if (frames % 480 != 0) throw new InvalidDataException("Data stream was not divisible by 480 chunks");
+            int blockSize = 480;
+            for (int blockOffset = 0; blockOffset < frames; blockOffset += blockSize)
+            {
+                const float alpha = 0.15f;
+                for (int k = 0; k < 1024; k++)
+                {
+                    _HReL[k] += (_HtReL[k] - _HReL[k]) * alpha;
+                    _HImL[k] += (_HtImL[k] - _HImL[k]) * alpha;
+                    _HReR[k] += (_HtReR[k] - _HReR[k]) * alpha;
+                    _HImR[k] += (_HtImR[k] - _HImR[k]) * alpha;
+                }
+                //L ear
+                Array.Clear(_block, 0, _block.Length);
+                Array.Clear(_blockIm, 0, _blockIm.Length);
+                for (int f = 0; f < 480; f++) _block[f] = x[2*(blockOffset + f)];
+                FFTProcessIter(_block, _blockIm);
+                for (int k = 0; k < _ffReL.Length; k++)
+                {
+                    _ffReL[k] = _HReL[k] * _block[k] - _HImL[k] * _blockIm[k];
+                    _ffImL[k] = _HReL[k] * _blockIm[k] + _HImL[k] * _block[k];
+                }
+                IFFTProcessIter(_ffReL, _ffImL);
+                for (int i = 0; i < _accL.Length; i++) _accL[i] += _ffReL[i];
+                for (int f = 0; f < 480; f++) dest[2 * (blockOffset + f)] = _accL[f] * 2;
+                for (int k = 0; k < 544; k++) _accL[k] = _accL[k + 480];
+                Array.Clear(_accL, 544, _accL.Length - 544);
+
+                //R ear
+                Array.Clear(_block, 0, _block.Length);
+                Array.Clear(_blockIm, 0, _blockIm.Length);
+                for (int f = 0; f < 480; f++) _block[f] = x[2 * (blockOffset + f) + 1];
+                FFTProcessIter(_block, _blockIm);
+                for (int k = 0; k < _ffReR.Length; k++)
+                {
+                    _ffReR[k] = _HReR[k] * _block[k] - _HImR[k] * _blockIm[k];
+                    _ffImR[k] = _HReR[k] * _blockIm[k] + _HImR[k] * _block[k];
+                }
+                IFFTProcessIter(_ffReR, _ffImR);
+                for (int i = 0; i < _accR.Length; i++) _accR[i] += _ffReR[i];
+                for (int f = 0; f < 480; f++) dest[2 * (blockOffset + f) + 1] = _accR[f] * 2;
+                for (int k = 0; k < 544; k++) _accR[k] = _accR[k + 480];
+                Array.Clear(_accR, 544, _accR.Length - 544);
+            }
+        }
+
+        public static float[] Resample(float[] srcIr, double srcRate, double destRate)
+        {
+            double ratio = destRate / srcRate;
+
+            int outLen = (int)Math.Floor(srcIr.Length * ratio);
+            float[] outIR = new float[outLen];
+
+            for (int i = 0; i < outLen; i++) {
+                double srcPos = i / ratio;
+
+                int left = (int)Math.Floor(srcPos);
+                int right = left + 1;
+
+                float frac = (float)(srcPos - left);
+                if (right >= srcIr.Length) outIR[i] = srcIr[left];
+                else outIR[i] = (srcIr[left] * (1.0f - frac)) + (srcIr[right] * frac);
+            }
+
+            return outIR;
+        }
+
+        public static void LoadAllHRTF(int ele)
+        {
+            for(int azIndex = 0; azIndex < 72; azIndex++)
+            {
+                float[] hL = HrtfDatabase.GetIr(ele, azIndex*5, "L");
+                float[] hR = HrtfDatabase.GetIr(ele, azIndex*5, "R");
+
+                hL = Resample(hL, 44100.0, 48000.0);
+                hR = Resample(hR, 44100.0, 48000.0);
+                hL = hL[0..512];
+                hR = hR[0..512];
+
+                float sL = hL.Sum(a => MathF.Abs(a));
+                float sR = hR.Sum(a => MathF.Abs(a));
+                for (int i = 0; i < hL.Length; i++)
+                {
+                    hL[i] /= sL;
+                    hR[i] /= sR;
+                }
+
+                float[] phL = new float[1024];
+                float[] phR = new float[1024];
+                for(int i = 0;i < hL.Length; i++)
+                {
+                    phL[i] = hL[i];
+                    phR[i] = hR[i];
+                }
+                (_tableHReL[azIndex], _tableHImL[azIndex]) = FFTProcess(phL, new float[phL.Length]);
+                (_tableHReR[azIndex], _tableHImR[azIndex]) = FFTProcess(phR, new float[phR.Length]);
+            }
+        }
 
         public static void Reset()
         {
@@ -428,7 +538,7 @@ namespace SpatialAudio
             _hrtfPosR = 0;
         }
 
-       static Spatializer()
+        static Spatializer()
         {
             for(int i = 0; i < 512; i++)
             {
@@ -436,6 +546,7 @@ namespace SpatialAudio
                 _twRe[i] = MathF.Cos(angle);
                 _twIm[i] = MathF.Sin(angle);
             }
+            if(HrtfDatabase.IsAvailable()) LoadAllHRTF(0);
         }
     }
 }
