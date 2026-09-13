@@ -11,10 +11,18 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
 	<Compile Remove="SpatialAudio.Tests/**" />
 	<None Remove="SpatialAudio.Tests/**" />
+	<Compile Remove="SpatialAudio.Telemetry/**" />
+	<None Remove="SpatialAudio.Telemetry/**" />
+	<Compile Remove="SpatialAudio.Visualizer/**" />
+	<None Remove="SpatialAudio.Visualizer/**" />
 
 	  <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
 		  <_Parameter1>SpatialAudio.Tests</_Parameter1>
 	  </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="SpatialAudio.Telemetry\SpatialAudio.Telemetry.csproj" />
   </ItemGroup>
 
 </Project>
