@@ -71,9 +71,9 @@ namespace SpatialAudio.Tests
             TelemetryFrame? f = TelemetryCodec.ReadFrame(m);
             TelemetryFrame? f2 = TelemetryCodec.ReadFrame(m);
             TelemetryFrame? f3 = TelemetryCodec.ReadFrame(m);
-            Assert.Equal(frame.Sequence, f.Sequence);
-            Assert.Equal(frame2.Sequence, f2.Sequence);
-            Assert.Equal(frame3.Sequence, f3.Sequence);
+            Assert.Equal(frame.Sequence, f!.Sequence);
+            Assert.Equal(frame2.Sequence, f2!.Sequence);
+            Assert.Equal(frame3.Sequence, f3!.Sequence);
         }
 
         [Fact]

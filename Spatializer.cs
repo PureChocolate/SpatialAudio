@@ -47,6 +47,9 @@ namespace SpatialAudio
         internal static float[] _HtImR = new float[1024];
         private static bool _filterPrimed = false;
         private const float MasterGain = 4f;
+
+        public static float OutputLevelL { get; private set; }
+        public static float OutputLevelR { get; private set; }
         #endregion
 
         internal static void UpdateFilter(float azimuthDeg)
@@ -89,6 +92,8 @@ namespace SpatialAudio
             //HRTFProcess(samples, _scratch);
             OLAProcess(samples, _scratch);
             for (int i = 0; i < _scratch.Length; i++) _scratch[i] *= MasterGain;
+            OutputLevelL = PeakLevel(_scratch, 0);
+            OutputLevelR = PeakLevel(_scratch, 1);
             Buffer.BlockCopy(_scratch, 0, _processed,0,_scratch.Length*4);
             return _processed;
         }
@@ -536,6 +541,25 @@ namespace SpatialAudio
             Array.Clear(_hrtfRingR, 0, _hrtfRingR.Length);
             _hrtfPosL = 0;
             _hrtfPosR = 0;
+        }
+
+        public static float PeakLevel(float[] interleaved, int channel)
+        {
+            float m = 0;
+            for(int i = 0; i < interleaved.Length / 2;i++)
+            {
+                m = MathF.Max(MathF.Abs(m), MathF.Abs(interleaved[(2 * i) + channel]));
+            }
+            return m;
+        }
+
+        public static void GetHRTFMagnitude(float[] magL, float[] magR)
+        { 
+            for(int i = 0; i < magL.Length; i++)
+            {
+                magL[i] = MathF.Sqrt(MathF.Pow(_HImL[i],2) + MathF.Pow(_HReL[i], 2));
+                magR[i] = MathF.Sqrt(MathF.Pow(_HImR[i], 2) + MathF.Pow(_HReR[i], 2));
+            }
         }
 
         static Spatializer()
