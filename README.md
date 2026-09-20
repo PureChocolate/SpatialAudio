@@ -1,4 +1,4 @@
-# SpatialAudio
+# SpatialAudio — Desktop Audio Spatializer
 
 [![CI](https://github.com/PureChocolate/SpatialAudio/actions/workflows/ci.yaml/badge.svg)](https://github.com/PureChocolate/SpatialAudio/actions/workflows/ci.yaml)
 ![.NET 8](https://img.shields.io/badge/.NET-8.0-512BD4)
@@ -9,6 +9,10 @@ Turn your desktop into a sound stage: audio is positioned in 3D space based on
 where its window sits on your (multi-)monitor setup.
 
 ![SpatialAudio demo — desktop audio following the focused window](docs/demo.gif)
+
+**Portfolio:** [gurkirat.net](https://gurkirat.net) · **Demo post:** [LinkedIn](https://www.linkedin.com/feed/update/urn:li:activity:7496308098668716032) · **GitHub:** [PureChocolate](https://github.com/PureChocolate)
+
+**Stack:** C# / .NET 8 · NAudio · WASAPI loopback · Win32 P/Invoke · from-scratch split-complex FFT · MIT KEMAR HRTF · xUnit + GitHub Actions CI
 
 A C# / .NET learning project. All code written by the learner (me), guided and
 reviewed by an AI mentor. Personal study notes are kept out of the repo.
