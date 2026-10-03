@@ -1,6 +1,6 @@
 ﻿using NAudio.CoreAudioApi;
 using NAudio.Wave;
-using System;
+using SpatialAudio.Telemetry;
 using System.Runtime.InteropServices;
 
 namespace SpatialAudio{
@@ -75,32 +75,20 @@ namespace SpatialAudio{
                     WasapiOut output = new WasapiOut(devices[o - 1], AudioClientShareMode.Shared, false, 100);
                     output.Init(bufferedWave);
                     output.Play();
+
+                    using var server = new TelemetryServer(TelemetryProtocol.DefaultPipeName, EngineTelemetry.Sample);
+                    server.Start();
+
                     Console.WriteLine();
                     Console.WriteLine($"{Dim}CAPTURE: {devices[c - 1].FriendlyName}  ->  OUTPUT: {devices[o - 1].FriendlyName}{Reset}");
                     Console.WriteLine();
 
-                    int readoutRow = Console.CursorTop;
                     Console.CursorVisible = false;
-                    string lastLine = "";
+                    Console.WriteLine("Telemetry server running. Press Esc to quit.");
                     while (true)
                     {
                         if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape) break;
-                        var (az, dist, title) = WindowTracker.GetFocusedInfo();
-                        Spatializer.CurrentAzimuthDeg = az;
-                        if (title.Length > 40) title = title.Substring(0, 40);
-                        string color = az < 0 ? Blue : Green;
-                        string side = az < 0 ? "left" : "right";
-                        string visibleLine = $"{title,-40} -> {az:F1} deg {side}, {dist:F0}px";
-                        string line = $"{title,-40} -> {color}{az:F1} deg {side}{Reset}, {Dim}{dist:F0}px{Reset}";
-                        int pad = 110 - visibleLine.Length;
-                        if (pad > 0) line += new string(' ', pad);
-                        if (line != lastLine)
-                        {
-                            Console.SetCursorPosition(0, readoutRow);
-                            Console.Write(line);
-                            lastLine = line;
-                        }
-                        Thread.Sleep(300);
+                        Thread.Sleep(100);
                     }
                     Console.CursorVisible = true;
                     Console.WriteLine();
