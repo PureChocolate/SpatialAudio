@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpatialAudio.Telemetry\SpatialAudio.Telemetry.csproj" />
+    <ProjectReference Include="..\SpatialAudio.Visualizer\SpatialAudio.Visualizer.csproj" />
   </ItemGroup>
 
 </Project>
