@@ -38,15 +38,13 @@ namespace SpatialAudio.Tests
         }
 
         [Fact]
-        public void SpectrumColumns()
+        public void SpectrumColumnsLog()
         {
             float[] mag = { 0, 1, 2, 3, 4, 5, 6, 7 };
-            float[] dest = new float[4];
-
-            Renderer.SpectrumColumns(mag, dest);
-
-            // groups [0,1] [2,3] [4,5] [6,7] -> max of each
-            Assert.Equal(new float[] { 1, 3, 5, 7 }, dest);
+            float[] dest = new float[3];
+            Renderer.SpectrumColumnsLog(mag, dest, binHz: 1000f, minHz: 1000f, maxHz: 8000f);
+            // per-column log bin ranges (no gaps): col0 picks bin1=1; col1 picks max(2,3)=3; col2 picks max(4..7)=7
+            Assert.Equal(new float[] { 1, 3, 7 }, dest);
         }
 
         [Fact]
@@ -66,7 +64,7 @@ namespace SpatialAudio.Tests
 
             string[] lines = Renderer.RenderFrame(f, 40);
 
-            Assert.Equal(Renderer.frameHeight, lines.Length);
+            Assert.Equal(Renderer.FrameHeight, lines.Length);
             foreach (string line in lines)
             {
                 Assert.Equal(40, line.Length); // every line exactly width
