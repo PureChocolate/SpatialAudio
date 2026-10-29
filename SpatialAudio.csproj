@@ -15,6 +15,8 @@
 	<None Remove="SpatialAudio.Telemetry/**" />
 	<Compile Remove="SpatialAudio.Visualizer/**" />
 	<None Remove="SpatialAudio.Visualizer/**" />
+	<Compile Remove="SpatialAudio.Visualizer.Core/**" />
+	<None Remove="SpatialAudio.Visualizer.Core/**" />
 
 	  <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
 		  <_Parameter1>SpatialAudio.Tests</_Parameter1>

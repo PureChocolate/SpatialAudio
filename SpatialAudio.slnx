@@ -2,5 +2,6 @@
   <Project Path="SpatialAudio.csproj" />
   <Project Path="SpatialAudio.Telemetry/SpatialAudio.Telemetry.csproj" />
   <Project Path="SpatialAudio.Tests/SpatialAudio.Tests.csproj" Id="7409811f-cfcb-466f-9ce8-0c2d1bea5383" />
+  <Project Path="SpatialAudio.Visualizer.Core/SpatialAudio.Visualizer.Core.csproj" Id="08abf648-d633-45ee-94c8-1e61f7f5117f" />
   <Project Path="SpatialAudio.Visualizer/SpatialAudio.Visualizer.csproj" />
 </Solution>
