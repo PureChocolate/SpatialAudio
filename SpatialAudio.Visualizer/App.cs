@@ -9,6 +9,7 @@ namespace SpatialAudio.Visualizer
         IWindow _window = null!;
         GL _gl = null!;
         IInputContext? _input = null;
+        GlRenderer? _renderer;
         public static void Run()
         {
             using var app = new App();
@@ -23,6 +24,8 @@ namespace SpatialAudio.Visualizer
         void OnLoad()
         {
             _gl = GL.GetApi(_window);
+            _renderer = new GlRenderer();
+            _renderer.Init(_gl);
             _gl.ClearColor(0.05f, 0.06f, 0.09f, 1f);
             _input = _window.CreateInput();
             _input.Keyboards[0].KeyDown += OnKey;
@@ -45,6 +48,7 @@ namespace SpatialAudio.Visualizer
 
         void OnClosing()
         {
+            _renderer?.Dispose();
             _input?.Dispose();
             _gl?.Dispose();
         }
