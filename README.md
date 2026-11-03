@@ -12,7 +12,7 @@ where its window sits on your (multi-)monitor setup.
 
 **Portfolio:** [gurkirat.net](https://gurkirat.net) · **Demo post:** [LinkedIn](https://www.linkedin.com/feed/update/urn:li:activity:7496308098668716032) · **GitHub:** [PureChocolate](https://github.com/PureChocolate)
 
-**Stack:** C# / .NET 8 · NAudio · WASAPI loopback · Win32 P/Invoke · from-scratch split-complex FFT · MIT KEMAR HRTF · xUnit + GitHub Actions CI
+**Stack:** C# / .NET 8 · NAudio · WASAPI loopback · Win32 P/Invoke · from-scratch split-complex FFT · MIT KEMAR HRTF · Silk.NET / OpenGL (visualizer, in progress) · xUnit + GitHub Actions CI
 
 A C# / .NET learning project. All code written by the learner (me), guided and
 reviewed by an AI mentor. Personal study notes are kept out of the repo.
@@ -25,6 +25,7 @@ reviewed by an AI mentor. Personal study notes are kept out of the repo.
 | M1 | Track focused window position → azimuth/distance across monitors | **done** — Win32 window/monitor tracking, live azimuth readout (front-arc model, ±70° stage) |
 | M2 | Spatializer v1: interaural time delay + level panning | **done** — ITD ring-buffer delay + equal-power ILD; audio follows the focused window; direction verified by ear |
 | M3 | HRTF: true 3D audio via convolution with measured head filters | **done** — KEMAR HRIR loader; direct-form convolution; from-scratch radix-2 FFT/IFFT + overlap-add; azimuth→HRIR lookup with per-direction crossfade and temporal smoothing; 44.1k→48k IR resampling; audio follows the focused window. xUnit DSP suite (19 tests) |
+| Visualizer (M3.5–M3.6) | Named-pipe telemetry + a graphical OpenGL visualizer | **in progress** — telemetry/console frame done; OpenGL 3.3 app (window, shaders, first quad) underway |
 | M4 | Polish: smoothing, config, standalone .exe | not started |
 | M5 (stretch) | Per-app audio routing via virtual cable | not started |
 | M6 (stretch) | GUI: window map + speaker positions | not started |
@@ -53,7 +54,9 @@ Chu2 headphones → you hear the mix spatialized, ~100 ms delayed.
 
 ## Tests
 
-`dotnet test` runs the DSP suite: FFT vs the direct DFT, IFFT round-trips,
+`dotnet test` runs the suite (29 tests): FFT vs the direct DFT, IFFT round-trips,
 the convolution theorem, overlap-add vs direct convolution, the HRIR
-lookup/crossfade, and the KEMAR loader regression. Tests that need the dataset
-skip automatically when `data/` is absent, so CI stays green without it.
+lookup/crossfade, and the KEMAR loader regression — plus the telemetry
+codec/taps/transport and the visualizer's spectrum-mapping core. Tests that need
+the dataset skip automatically when `data/` is absent, so CI stays green without
+it.
