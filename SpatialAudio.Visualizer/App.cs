@@ -17,6 +17,7 @@ namespace SpatialAudio.Visualizer
             app._window.Load += app.OnLoad;
             app._window.Render += app.OnRender;
             app._window.Closing += app.OnClosing;
+            app._window.FramebufferResize += size => app._gl.Viewport(size);
             app._window.Run();
 
         }
@@ -24,6 +25,7 @@ namespace SpatialAudio.Visualizer
         void OnLoad()
         {
             _gl = GL.GetApi(_window);
+            _gl.Viewport(_window.FramebufferSize);
             _renderer = new GlRenderer();
             _renderer.Init(_gl);
             _gl.ClearColor(0.05f, 0.06f, 0.09f, 1f);
@@ -34,6 +36,7 @@ namespace SpatialAudio.Visualizer
         void OnRender(double dt)
         {
             _gl.Clear(ClearBufferMask.ColorBufferBit);
+            _renderer?.Render();
             if(dt > 0)
             {
                 double fps = 1.0 / dt;

@@ -6,11 +6,50 @@ namespace SpatialAudio.Visualizer
     {
         GL _gl = null!;
         uint _program;
+        uint _vao;
+        uint _vbo;
+
+
 
         public void Init(GL gl)
         {
             _gl = gl;
             _program = BuildProgram("quad.vert", "quad.frag");
+            SetupQuad();
+        }
+
+        private void SetupQuad()
+        {
+            float[] vertices = {
+                -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
+                -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f};
+
+            _vao = _gl.CreateVertexArray();
+            _gl.BindVertexArray(_vao);
+            _vbo = _gl.CreateBuffer();
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+
+            _gl.BufferData(
+                BufferTargetARB.ArrayBuffer,
+                (uint)(vertices.Length * sizeof(float)),
+                new ReadOnlySpan<float>(vertices),
+                BufferUsageARB.StaticDraw);
+
+            _gl.VertexAttribPointer(
+                0, 2, VertexAttribPointerType.Float, false,
+                2 * sizeof(float), IntPtr.Zero);
+            _gl.EnableVertexAttribArray(0);
+
+            _gl.BindVertexArray(0);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
+        }
+
+        public void Render()
+        {
+            _gl.UseProgram(_program);
+            _gl.BindVertexArray(_vao);
+            _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
+            _gl.BindVertexArray(0);
         }
 
         uint BuildProgram(string nameV, string nameF)
@@ -46,6 +85,9 @@ namespace SpatialAudio.Visualizer
         public void Dispose()
         {
             _gl.DeleteProgram(_program);
+            _gl.DeleteBuffer(_vbo);
+            _gl.DeleteVertexArray(_vao);
+
         }
     }
 }
