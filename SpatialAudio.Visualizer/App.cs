@@ -36,7 +36,7 @@ namespace SpatialAudio.Visualizer
         void OnRender(double dt)
         {
             _gl.Clear(ClearBufferMask.ColorBufferBit);
-            _renderer?.Render();
+            _renderer?.Render((float) _window.Time);
             if(dt > 0)
             {
                 double fps = 1.0 / dt;

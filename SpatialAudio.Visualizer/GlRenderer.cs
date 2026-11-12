@@ -6,6 +6,8 @@ namespace SpatialAudio.Visualizer
     {
         GL _gl = null!;
         uint _program;
+        int _uOffset;
+        int _uColor;
         uint _vao;
         uint _vbo;
 
@@ -15,6 +17,8 @@ namespace SpatialAudio.Visualizer
         {
             _gl = gl;
             _program = BuildProgram("quad.vert", "quad.frag");
+            _uOffset = _gl.GetUniformLocation(_program, "uOffset");
+            _uColor = _gl.GetUniformLocation(_program, "uColor");
             SetupQuad();
         }
 
@@ -44,9 +48,19 @@ namespace SpatialAudio.Visualizer
             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
         }
 
-        public void Render()
+        public void Render(float time)
         {
             _gl.UseProgram(_program);
+            float x = 0.45f * MathF.Cos(time);
+            float y = 0.35f * MathF.Sin(time);
+            _gl.Uniform2(_uOffset, x, y);
+            float[] colors = new float[3];
+            float phase = MathF.PI / 3;
+            for(int i = 0; i < 3; i++)
+            {
+                colors[i] = 0.5f + 0.5f * MathF.Sin(time + phase * (i * 2));
+            }
+            _gl.Uniform4(_uColor, colors[0], colors[1],colors[2],1f);
             _gl.BindVertexArray(_vao);
             _gl.DrawArrays(PrimitiveType.Triangles, 0, 6);
             _gl.BindVertexArray(0);
