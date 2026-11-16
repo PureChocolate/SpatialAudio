@@ -19,6 +19,11 @@ namespace SpatialAudio.Tests
                 frame.MagL[i] = i * 0.01f;
                 frame.MagR[i] = 1f - (i * .01f);
             }
+            for(int i = 0; i < SpectrumBands.Count; i++)
+            {
+                frame.SpectrumL[i] = i * 0.01f;
+                frame.SpectrumR[i] = 1f - i * 0.01f;
+            }
             MemoryStream m = new MemoryStream();
             TelemetryCodec.WriteFrame(m, frame);
             m.Position = 0;
@@ -36,6 +41,18 @@ namespace SpatialAudio.Tests
                 Assert.True(Math.Abs(frame.MagL[i] - f.MagL[i]) < 1e-4f);
                 Assert.True(Math.Abs(frame.MagR[i] - f.MagR[i]) < 1e-4f);
             }
+            for(int i = 0;i < SpectrumBands.Count; i++)
+            {
+                Assert.True(Math.Abs(frame.SpectrumL[i] - f.SpectrumL[i]) < 1e-4f);
+                Assert.True(Math.Abs(frame.SpectrumR[i] - f.SpectrumR[i]) < 1e-4f);
+            }
+        }
+
+        [Fact]
+        public void SpectrumBandstests()
+        {
+            Assert.Equal(100, SpectrumBands.LowHz(0));
+            Assert.True(MathF.Abs(16000f - SpectrumBands.HighHz(95)) < 1e-4f);
         }
 
         [Fact]

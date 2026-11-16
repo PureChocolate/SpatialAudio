@@ -11,5 +11,7 @@
         public float LevelR { get; set; }
         public float[] MagL { get; set; } = new float[SpectrumBins];
         public float[] MagR { get; set; } = new float[SpectrumBins];
+        public float[] SpectrumL { get; set; } = new float[SpectrumBands.Count];
+        public float[] SpectrumR { get; set; } = new float[SpectrumBands.Count];
     }
 }

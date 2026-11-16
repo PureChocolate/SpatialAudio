@@ -18,6 +18,9 @@ namespace SpatialAudio.Telemetry
             bw.Write(TelemetryFrame.SpectrumBins);
             bw.Write(MemoryMarshal.AsBytes(f.MagL.AsSpan()));
             bw.Write(MemoryMarshal.AsBytes(f.MagR.AsSpan()));
+            bw.Write((int)SpectrumBands.Count);
+            bw.Write(MemoryMarshal.AsBytes(f.SpectrumL.AsSpan()));
+            bw.Write(MemoryMarshal.AsBytes(f.SpectrumR.AsSpan()));
             bw.Flush();
             byte[] len = (BitConverter.GetBytes((int)m.Length));
             s.Write(len, 0, 4);
@@ -54,6 +57,10 @@ namespace SpatialAudio.Telemetry
 
             br.Read(MemoryMarshal.AsBytes(f.MagL.AsSpan()));
             br.Read(MemoryMarshal.AsBytes(f.MagR.AsSpan()));
+            int bands = br.ReadInt32();
+            if (bands != SpectrumBands.Count) throw new InvalidDataException("Wrong bands");
+            br.Read(MemoryMarshal.AsBytes(f.SpectrumL.AsSpan()));
+            br.Read(MemoryMarshal.AsBytes(f.SpectrumR.AsSpan()));
 
             return f;
         }
